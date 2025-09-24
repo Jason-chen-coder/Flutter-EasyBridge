@@ -192,7 +192,6 @@ _bridge.register('page.h5ToFlutter', (params) async {
 
 ```dart
 // 发送事件到 H5（无需等待返回）
-await _bridge.emitEventToJs('app.visibility', {'visible': true});
 await _bridge.emitEventToJs('user.login', {'userId': 123});
 ```
 
@@ -200,9 +199,6 @@ await _bridge.emitEventToJs('user.login', {'userId': 123});
 
 ```javascript
 // 监听 Flutter 发送的事件
-window.AppBridge.on('app.visibility', function(payload) {
-  console.log('应用可见性变化:', payload.visible);
-});
 
 window.AppBridge.on('user.login', function(payload) {
   console.log('用户登录:', payload.userId);
@@ -256,7 +252,6 @@ _bridge.onEvent('user.action', (payload) {
 
 | 事件名 | 数据格式 | 说明 |
 |--------|----------|------|
-| `app.visibility` | `{visible: boolean}` | 应用可见性变化 |
 | `user.login` | `{userId: number, username: string}` | 用户登录状态 |
 
 #### H5 → Flutter 事件
@@ -291,7 +286,6 @@ _bridge.onEvent('user.action', (payload) {
    └── H5 发送 page.ready 事件
    
 7. Flutter 响应并建立连接
-   ├── 发送 app.visibility 事件
    └── 调用 page.getState 获取初始状态
 ```
 
@@ -476,11 +470,6 @@ document.addEventListener('DOMContentLoaded', function () {
       return { data: 'Hello from MyApp' };
     });
     
-    // 监听事件
-    window.AppBridge.on('app.visibility', function(payload) {
-      console.log('可见性变化:', payload);
-    });
-    
     // 发送就绪事件
     window.AppBridge.emit('page.ready', { 
       ts: Date.now(), 
@@ -635,3 +624,7 @@ A: 确保事件监听器在发送事件之前就已注册，检查事件名是�
 2. 查看 `assets/h5/app1/dist/` 的代码实现
 3. 参考 API 清单添加自己的方法和事件
 4. 创建新的 H5 应用进行实践
+
+## TODO
+1.windows平台支持
+2.H5 和app 单向通信示例

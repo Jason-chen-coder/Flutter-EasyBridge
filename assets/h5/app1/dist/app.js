@@ -64,13 +64,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  // Subscribe to a native event (Flutter -> JS)
-  if (window.AppBridge && typeof window.AppBridge.on === 'function') {
-    window.AppBridge.on('app.visibility', function (payload) {
-      appendItem(fromFlutterList,  JSON.stringify(payload), 'flutter-to-h5');
-    });
-  }
-
   // Register methods (JS -> Flutter can invoke)
   if (window.AppBridge && typeof window.AppBridge.register === 'function') {
     window.AppBridge.register('page.getState', async function () {

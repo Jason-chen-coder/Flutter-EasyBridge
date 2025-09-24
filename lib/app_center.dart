@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_h5/utils/localhost_server_manager.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-
-import 'local_h5_webview.dart';
+import 'package:flutter_h5/utils/app_bridge.dart';
+import 'app1_h5_webview_debug_page.dart';
+import 'h5_webview.dart';
 
 class AppItem {
   final String title;
-  final String path;
   final IconData icon;
-  final String? remoteUrl;
+  final WidgetBuilder builder;
 
   const AppItem({
     required this.title,
-    required this.path,
     required this.icon,
-    this.remoteUrl,
+    required this.builder,
   });
 }
 
@@ -22,9 +19,43 @@ class AppCenterPage extends StatelessWidget {
   const AppCenterPage({super.key});
 
   List<AppItem> _buildApps() {
-    return const [
-      AppItem(title: '示例应用 A', path: 'app1', icon: Icons.web),
-      AppItem(title: '示例应用 B', path: 'app2', icon: Icons.language),
+    return [
+      AppItem(
+        title: '示例应用 A (本地)',
+        icon: Icons.web,
+        builder:
+            (context) =>
+                App1H5WebviewDebugPage(key: UniqueKey(),appName: 'app1'),
+      ),
+      AppItem(
+        title: '示例应用 B (本地)',
+        icon: Icons.language,
+        builder:
+            (context) => Scaffold(
+              backgroundColor: Colors.white,
+              appBar: AppBar(backgroundColor: Colors.white),
+              body: H5Webview(
+                key: UniqueKey(),
+                appName: 'app2',
+                bridge: AppBridge(),
+              ),
+            ),
+      ),
+      AppItem(
+        title: '在线应用示例',
+        icon: Icons.cloud,
+        builder:
+            (context) => Scaffold(
+              backgroundColor: Colors.white,
+              appBar: AppBar(backgroundColor: Colors.white),
+              body: H5Webview(
+                key: UniqueKey(),
+                appName: 'online_demo',
+                bridge: AppBridge(),
+                onlineUrl: 'https://baidu.com',
+              ),
+            ),
+      ),
     ];
   }
 
@@ -50,20 +81,9 @@ class AppCenterPage extends StatelessWidget {
               title: app.title,
               icon: app.icon,
               onTap: () async {
-                final LocalhostServerManager _serverManager =
-                    LocalhostServerManager();
-                final baseUrl = await _serverManager.start(
-                  documentRoot: 'assets/h5',
-                );
-
-                // Try to find index.html in the dist subdirectory first, then fallback to app directory
-                String path = '/app1/dist/index.html';
-                final url = '$baseUrl$path';
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LocalH5WebView(key:UniqueKey(),appName: app.path)
-                  ),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => app.builder(context)));
               },
             );
           },

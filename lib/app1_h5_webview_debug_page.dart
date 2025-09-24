@@ -1,17 +1,17 @@
 // Reusable widget to load local H5 packaged under assets/h5/<appName>/index.html
-import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'utils/localhost_server_manager.dart';
-import 'utils/app_bridge.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'utils/app_bridge.dart';
+import 'h5_webview.dart';
 
 typedef WebViewCreatedCallback =
     void Function(InAppWebViewController controller);
 
-class LocalH5WebView extends StatefulWidget {
+class App1H5WebviewDebugPage extends StatefulWidget {
   /// appName should correspond to the folder name under assets/h5, e.g. "app1" or "app2"
   /// The entry point will be assets/h5/<appName>/dist/index.html
+  /// This is ignored if onlineUrl is provided
   final String appName;
 
   final WebViewCreatedCallback? onWebViewCreated;
@@ -19,7 +19,7 @@ class LocalH5WebView extends StatefulWidget {
   final void Function(String url, int code, String message)? onLoadError;
   final void Function(int progress)? onProgress;
 
-  const LocalH5WebView({
+  const App1H5WebviewDebugPage({
     Key? key,
     required this.appName,
     this.onWebViewCreated,
@@ -29,17 +29,11 @@ class LocalH5WebView extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _LocalH5WebViewState createState() => _LocalH5WebViewState();
+  _App1H5WebviewDebugPageState createState() => _App1H5WebviewDebugPageState();
 }
 
-class _LocalH5WebViewState extends State<LocalH5WebView> {
-  final LocalhostServerManager _serverManager = LocalhostServerManager();
+class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
   final AppBridge _bridge = AppBridge();
-  InAppWebViewController? _controller;
-  Key _webViewKey = UniqueKey();
-  String? _initialUrl;
-  bool _isLoaded = false;
-  int _progress = 0; // 0-100
   dynamic _lastH5Reply;
   String? _arrowOutMsg; // Flutter -> H5
   String? _arrowInMsg; // H5 -> Flutter
@@ -54,6 +48,13 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
   // Scroll controllers for message lists
   final ScrollController _fromH5ScrollController = ScrollController();
   final ScrollController _h5RepliesScrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _setupBridgeMethods();
+    _setupBridgeEvents();
+  }
 
   String _twoDigits(int n) => n.toString().padLeft(2, '0');
   String _formatTs(DateTime dt) {
@@ -205,15 +206,116 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
     );
   }
 
+  // 设置 bridge 方法(H5 调用 Flutter方法)
+  void _setupBridgeMethods() {
+    // Add page.h5ToFlutter method with debug functionality
+    _bridge.register('page.h5ToFlutter', (params) async {
+      print('[DEBUG] page.h5ToFlutter called with params: $params');
+      
+      // Handle different parameter formats
+      String message;
+      String? from;
+      if (params is Map) {
+        message = params['message']?.toString() ?? 'No message';
+        from = params['from']?.toString();
+      } else if (params is String) {
+        message = params;
+      } else {
+        message = params?.toString() ?? 'null';
+      }
+      
+      // Create full message with context
+      final fullMessage = from != null ? '$message (from: $from)' : message;
+      
+      print('[DEBUG] Extracted message: $message, from: $from');
+      
+      // Update UI immediately using setState
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _arrowInMsg = fullMessage;
+          });
+          _appendFromH5(fullMessage);
+        }
+      });
+      
+      // Create the reply
+      final Map<String, Object> reply = {
+        'reply': 'Flutter 已收到: $fullMessage',
+        'page': 'app1',
+        'ts': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      // Update outgoing message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _arrowOutMsg = reply.toString();
+          });
+        }
+      });
+      
+      print('[DEBUG] Returning reply: $reply');
+      return reply;
+    });
+    
+    // Add app.getInfo method with debug functionality
+    _bridge.register('app.getInfo', (params) async {
+      print('[DEBUG] app.getInfo called with params: $params');
+      
+      // Update UI to show incoming request
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _arrowInMsg = 'Get App Info';
+          });
+          _appendFromH5('H5 请求获取 App 信息');
+        }
+      });
+      
+      final info = await PackageInfo.fromPlatform();
+      final Map<String, Object?> result = {
+        'appName': info.appName,
+        'packageName': info.packageName,
+        'version': info.version,
+        'buildNumber': info.buildNumber,
+        'buildSignature': info.buildSignature,
+        'installerStore': info.installerStore,
+      };
+      
+      // Update UI to show outgoing response
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _arrowOutMsg = result.toString();
+          });
+        }
+      });
+      
+      print('[DEBUG] app.getInfo returning: $result');
+      return result;
+    });
+  }
+
+  // 设置 bridge 事件监听(H5 主动发送事件)
+  void _setupBridgeEvents() {
+    // Add page.ready event handler
+    _bridge.onEvent('page.ready', (payload) {
+      debugPrint('App1 - H5 page.ready: $payload');
+      _appendFromH5(payload.toString());
+    });
+  }
+
   // Method to send custom message from input field
   Future<void> _sendCustomMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
-    if (mounted)
+    if (mounted) {
       setState(() {
         _arrowOutMsg = message;
       });
+    }
     try {
       final res = await _bridge.invokeJs('page.echo', {'message': message});
       if (mounted) {
@@ -235,45 +337,11 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _startServerAndLoad();
-  }
 
-  @override
-  void reassemble() {
-    super.reassemble();
-  }
-
-  Future<void> _startServerAndLoad() async {
-    final baseUrl = await _serverManager.start(documentRoot: 'assets/h5');
-    
-    // Try to find index.html in the dist subdirectory first, then fallback to app directory
-    String path = '/${widget.appName}/dist/index.html';
-    
-    final url = '$baseUrl$path';
-    setState(() {
-      _initialUrl = url;
-      _webViewKey = UniqueKey();
-    });
-
-    // If controller already exists, load the URL immediately
-    if (_controller != null && _initialUrl != null) {
-      await _controller!.loadUrl(
-        urlRequest: URLRequest(url: WebUri(_initialUrl!)),
-      );
-    }
-  }
 
   @override
   void dispose() {
-    // Detach bridge and release controller to ensure platform view is disposed cleanly
-    _bridge.detach();
-    if (_controller != null) {
-      _controller?.dispose();
-      _controller = null;
-    }
+    _bridge.detach(); // 清理外部管理的 bridge
     _messageController.dispose(); // Dispose text controller
     _fromH5ScrollController.dispose(); // Dispose scroll controllers
     _h5RepliesScrollController.dispose();
@@ -282,11 +350,6 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
 
   @override
   Widget build(BuildContext context) {
-    // show a placeholder while computing the initial URL / starting server
-    if (_initialUrl == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(backgroundColor: Colors.white),
@@ -378,10 +441,11 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
                             foregroundColor: Colors.white,
                           ),
                           onPressed: () async {
-                            if (mounted)
+                            if (mounted) {
                               setState(() {
                                 _arrowOutMsg = 'Get H5 Info';
                               });
+                            }
                             try {
                               final res = await _bridge.invokeJs('h5.getInfo');
                               if (mounted) {
@@ -506,150 +570,27 @@ class _LocalH5WebViewState extends State<LocalH5WebView> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    children: [
-                      InAppWebView(
-                        key: _webViewKey,
-                        initialUrlRequest: URLRequest(
-                          url: WebUri(_initialUrl!),
-                        ),
-                        initialOptions: InAppWebViewGroupOptions(
-                          crossPlatform: InAppWebViewOptions(
-                            javaScriptEnabled: true,
-                            useOnLoadResource: true,
-                          ),
-                          ios: IOSInAppWebViewOptions(
-                            allowsInlineMediaPlayback: true,
-                          ),
-                        ),
-                        initialUserScripts: UnmodifiableListView<UserScript>([
-                          _bridge.userScript,
-                        ]),
-                        onWebViewCreated: (controller) async {
-                          _controller = controller;
-                          await _bridge.attach(controller);
-                          _bridge.register('page.h5ToFlutter', (params) async {
-                            final dynamic rawMessage =
-                                (params is Map) ? params['message'] : null;
-                            final String message =
-                                rawMessage?.toString() ?? params.toString();
-                            if (mounted) {
-                              setState(() {
-                                // H5 -> Flutter inbound message (right arrow)
-                                _arrowInMsg = message;
-                              });
-                            }
-                            _appendFromH5(message);
-                            final Map<String, Object> reply = {
-                              'reply': 'Flutter 已收到: $message',
-                              'page': widget.appName,
-                              'ts': DateTime.now().millisecondsSinceEpoch,
-                            };
-                            if (mounted) {
-                              setState(() {
-                                // Flutter -> H5 reply (left arrow)
-                                _arrowOutMsg = reply['reply'] as String;
-                              });
-                            }
-                            return reply;
-                          });
-                            _bridge.register('app.getInfo', (params) async {
-                              final info = await PackageInfo.fromPlatform();
-                              final Map<String, Object?> result = {
-                                'appName': info.appName,
-                                'packageName': info.packageName,
-                                'version': info.version,
-                                'buildNumber': info.buildNumber,
-                                'buildSignature': info.buildSignature,
-                                'installerStore': info.installerStore,
-                              };
-                              if (mounted) {
-                                setState(() {
-                                  _arrowOutMsg = result.toString();
-                                });
-                              }
-                              return result;
-                            });
-                          _bridge.onEvent('app.visibility', (payload) {
-                            debugPrint('H5 says visibility: $payload');
-                            _appendFromH5(payload.toString());
-                          });
-                          _bridge.onEvent('page.ready', (payload) {
-                            debugPrint('H5 page.ready: $payload');
-                            _appendFromH5(payload.toString());
-                          });
-
-                          if (widget.onWebViewCreated != null)
-                            widget.onWebViewCreated!(controller);
-                        },
-                        onLoadStart: (c, url) {
-                          setState(() {
-                            _isLoaded = false;
-                            _progress = 0;
-                          });
-                        },
-                        onLoadStop: (c, url) async {
-                          if (mounted) {
-                            setState(() {
-                              _isLoaded = true;
-                              _progress = 100;
-                            });
-                          }
-                          // Notify JS that page is visible, then try calling a JS method to fetch state
-                          await _bridge.emitEventToJs('app.visibility', {
-                            'visible': true,
-                          });
-                          try {
-                            final state = await _bridge.invokeJs(
-                              'page.getState',
-                            );
-                            debugPrint('JS page.getState -> $state');
-                            _appendH5Reply(state.toString());
-                          } catch (e) {
-                            debugPrint('JS page.getState error -> $e');
-                            _appendH5Reply('Error: ${e.toString()}');
-                          }
-                          if (widget.onLoadStop != null)
-                            widget.onLoadStop!(url?.toString() ?? '');
-                        },
-                        onConsoleMessage:
-                            (controller, consoleMessage) =>
-                                print('console: ${consoleMessage.message}'),
-                        onProgressChanged: (c, progress) {
-                          if (mounted) {
-                            setState(() => _progress = progress);
-                          }
-                          if (widget.onProgress != null)
-                            widget.onProgress!(progress);
-                          print('progress $progress');
-                        },
-                      ),
-                      if(!_isLoaded)Container(
-                        color: Colors.white,
-                        alignment: Alignment.center,
-                        child: const CircularProgressIndicator(),
-                      ),
-                      // Top progress bar for H5 loading
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: AnimatedOpacity(
-                          opacity: (_progress >= 100) ? 0 : 1,
-                          duration: const Duration(milliseconds: 150),
-                          child: SizedBox(
-                            height: 2,
-                            child: LinearProgressIndicator(
-                              value:
-                                  (_progress <= 0 || _progress >= 100)
-                                      ? null
-                                      : (_progress / 100),
-                              backgroundColor: Colors.transparent,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: H5Webview(
+                    appName: widget.appName,
+                    bridge: _bridge,
+                    onWebViewCreated: widget.onWebViewCreated,
+                    onLoadStop: (url) {
+                      // Handle onLoadStop with additional debug functionality
+                      // Try calling a JS method to fetch state
+                      _bridge.invokeJs('page.getState').then((state) {
+                        debugPrint('JS page.getState -> $state');
+                        _appendH5Reply(state.toString());
+                      }).catchError((e) {
+                        debugPrint('JS page.getState error -> $e');
+                        _appendH5Reply('Error: ${e.toString()}');
+                      });
+                      
+                      if (widget.onLoadStop != null) {
+                        widget.onLoadStop!(url);
+                      }
+                    },
+                    onLoadError: widget.onLoadError,
+                    onProgress: widget.onProgress,
                   ),
                 ),
               ),

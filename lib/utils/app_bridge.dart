@@ -72,6 +72,7 @@ class AppBridge {
 
   /// Register a Flutter handler for a method (JS -> Flutter requests).
   void register(String method, FutureOr<dynamic> Function(dynamic params) handler) {
+    print('[AppBridge] Registering method: $method');
     _routes[method] = handler;
   }
 
@@ -160,8 +161,10 @@ class AppBridge {
       if (id == null || method == null) return;
 
       try {
+        print('[AppBridge] Handling request: method=$method, params=$params');
         final handler = _routes[method];
         if (handler == null) {
+          print('[AppBridge] Method not found: $method, available methods: ${_routes.keys.toList()}');
           await _sendToJs({
             'v': version,
             'type': 'response',
@@ -175,6 +178,7 @@ class AppBridge {
         }
 
         final result = await handler(params);
+        print('[AppBridge] Method result: $result');
         await _sendToJs({
           'v': version,
           'type': 'response',
