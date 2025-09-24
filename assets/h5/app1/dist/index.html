@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no, email=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>示例应用 A</title>
+    <base href="./" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>本地 H5 - 示例应用 A</h1>
+      
+      <!-- Android WebView Debug Info -->
+      <div id="webview-info" style="font-size: 12px; color: #666; margin-bottom: 16px; padding: 8px; background: #f0f0f0; border-radius: 4px;">
+        <div>用户代理检测中...</div>
+        <div id="touch-support"></div>
+      </div>
+      
+      <section class="panel">
+        <h2>接收 H5 → Flutter 后返回的消息</h2>
+        <ul id="flutter-replies-list" class="msg-list"></ul>
+      </section>
+      <section class="panel">
+        <h2>接收 Flutter 发送的消息</h2>
+        <ul id="from-flutter-list" class="msg-list"></ul>
+      </section>
+      <button id="get-app-info-btn">获取 App 版本信息</button>
+      <div class="input-row">
+        <input id="h5-input" type="text" placeholder="输入要发送给 Flutter 的消息" />
+        <button id="send-to-flutter-btn">发送给 Flutter</button>
+      </div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html> 

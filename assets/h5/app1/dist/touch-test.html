@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no, email=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>🧪 Android WebView 终极触摸测试</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        h1 {
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+        
+        .info-panel {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
+        .test-section {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-button {
+            display: block;
+            width: 100%;
+            max-width: 250px;
+            height: 60px;
+            margin: 15px auto;
+            padding: 0;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(255,255,255,0.3);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 10;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+        
+        .test-button:hover, .test-button:active {
+            transform: translateY(-2px) translateZ(0);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .test-button.green {
+            background: linear-gradient(45deg, #4ECDC4, #44A08D);
+        }
+        
+        .test-button.purple {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+        
+        .test-input {
+            display: block;
+            width: 100%;
+            max-width: 250px;
+            height: 50px;
+            margin: 15px auto;
+            padding: 15px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            font-size: 16px;
+            text-align: center;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            touch-action: manipulation;
+        }
+        
+        .touch-area {
+            width: 100%;
+            max-width: 250px;
+            height: 120px;
+            margin: 15px auto;
+            background: linear-gradient(45deg, #FA709A, #FEE140);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        
+        .touch-area:hover, .touch-area:active {
+            transform: scale(0.98);
+        }
+        
+        .result {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.4;
+            color: #00ff00;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-ok { background: #00ff00; }
+        .status-warning { background: #ffaa00; }
+        .status-error { background: #ff0000; }
+        
+        .clear-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            float: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Android WebView 终极触摸测试</h1>
+    
+    <!-- 环境信息面板 -->
+    <div class="info-panel" id="env-info">
+        <div>🔍 检测环境信息中...</div>
+    </div>
+    
+    <!-- 基础按钮测试 -->
+    <div class="test-section">
+        <h3>📱 基础按钮测试</h3>
+        <button class="test-button" id="test-btn-1">🔴 测试按钮 1</button>
+        <button class="test-button green" id="test-btn-2">🟢 测试按钮 2</button>
+        <button class="test-button purple" id="test-btn-3">🟣 测试按钮 3</button>
+    </div>
+    
+    <!-- 输入框测试 -->
+    <div class="test-section">
+        <h3>⌨️ 输入框测试</h3>
+        <input class="test-input" id="test-input" placeholder="点击这里输入文本" />
+    </div>
+    
+    <!-- 触摸区域测试 -->
+    <div class="test-section">
+        <h3>👆 自定义触摸区域</h3>
+        <div class="touch-area" id="touch-area">
+            🎯 触摸这里
+        </div>
+    </div>
+    
+    <!-- 日志面板 -->
+    <div class="test-section">
+        <h3>📋 事件日志</h3>
+        <button class="clear-btn" onclick="clearLog()">清空日志</button>
+        <div class="result" id="result">🚀 系统初始化中...<br></div>
+    </div>
+
+    <script>
+        const result = document.getElementById('result');
+        const envInfo = document.getElementById('env-info');
+        let eventCount = 0;
+        
+        function log(message, type = 'info') {
+            eventCount++;
+            const time = new Date().toLocaleTimeString();
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+            result.innerHTML += `${icon} ${eventCount}. [${time}] ${message}<br>`;
+            result.scrollTop = result.scrollHeight;
+        }
+        
+        function clearLog() {
+            result.innerHTML = '📋 日志已清空<br>';
+            eventCount = 0;
+        }
+        
+        // 环境检测
+        function detectEnvironment() {
+            const ua = navigator.userAgent;
+            const isAndroid = /Android/.test(ua);
+            const isWebView = /wv|Version.*Chrome/.test(ua);
+            const hasTouchSupport = 'ontouchstart' in window;
+            const hasPointerEvents = 'PointerEvent' in window;
+            
+            let html = '<h4>🔍 环境检测结果:</h4>';
+            html += `<div><span class="status-indicator ${isAndroid ? 'status-ok' : 'status-error'}"></span>Android: ${isAndroid ? '是' : '否'}</div>`;
+            html += `<div><span class="status-indicator ${isWebView ? 'status-warning' : 'status-ok'}"></span>WebView: ${isWebView ? '是' : '否'}</div>`;
+            html += `<div><span class="status-indicator ${hasTouchSupport ? 'status-ok' : 'status-error'}"></span>触摸支持: ${hasTouchSupport ? '是' : '否'}</div>`;
+            html += `<div><span class="status-indicator ${hasPointerEvents ? 'status-ok' : 'status-warning'}"></span>指针事件: ${hasPointerEvents ? '是' : '否'}</div>`;
+            html += `<div style="margin-top:10px; font-size:11px; opacity:0.8;">User Agent: ${ua.substring(0, 80)}...</div>`;
+            
+            envInfo.innerHTML = html;
+            
+            log(`环境检测完成 - Android:${isAndroid}, WebView:${isWebView}, Touch:${hasTouchSupport}`);
+        }
+        
+        // 初始化检测
+        detectEnvironment();
+        
+        // 按钮事件监听器
+        function addButtonListener(id, name) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            
+            // Click 事件
+            btn.addEventListener('click', function(e) {
+                log(`${name} 点击成功! 🎉`, 'success');
+                this.style.transform = 'scale(0.95) translateZ(0)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 150);
+            });
+            
+            // Touch 事件
+            btn.addEventListener('touchstart', function(e) {
+                log(`${name} touchstart 触发`, 'info');
+            }, { passive: true });
+            
+            btn.addEventListener('touchend', function(e) {
+                log(`${name} touchend 触发`, 'info');
+            }, { passive: true });
+            
+            // Mouse 事件 (作为备用)
+            btn.addEventListener('mousedown', function(e) {
+                log(`${name} mousedown 触发`, 'warning');
+            });
+            
+            btn.addEventListener('mouseup', function(e) {
+                log(`${name} mouseup 触发`, 'warning');
+            });
+        }
+        
+        // 初始化所有按钮
+        addButtonListener('test-btn-1', '红色按钮');
+        addButtonListener('test-btn-2', '绿色按钮');
+        addButtonListener('test-btn-3', '紫色按钮');
+        
+        // 输入框测试
+        const testInput = document.getElementById('test-input');
+        if (testInput) {
+            testInput.addEventListener('focus', function() {
+                log('输入框获得焦点 📝', 'success');
+            });
+            
+            testInput.addEventListener('blur', function() {
+                log('输入框失去焦点', 'info');
+            });
+            
+            testInput.addEventListener('input', function() {
+                log(`输入框内容改变: "${this.value}" ✏️`, 'success');
+            });
+            
+            testInput.addEventListener('touchstart', function() {
+                log('输入框 touchstart', 'info');
+            }, { passive: true });
+        }
+        
+        // 触摸区域测试
+        const touchArea = document.getElementById('touch-area');
+        if (touchArea) {
+            touchArea.addEventListener('touchstart', function(e) {
+                log('触摸区域 touchstart 🖐️', 'info');
+                this.style.transform = 'scale(0.95)';
+            }, { passive: true });
+            
+            touchArea.addEventListener('touchend', function(e) {
+                log('触摸区域 touchend ✋', 'info');
+                this.style.transform = '';
+            }, { passive: true });
+            
+            touchArea.addEventListener('click', function() {
+                log('触摸区域点击成功! 🎯', 'success');
+            });
+        }
+        
+        // 全局事件监听
+        let globalTouchCount = 0;
+        let globalClickCount = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+            globalTouchCount++;
+            if (globalTouchCount <= 5) { // 只记录前5次，避免日志过多
+                log(`全局 touchstart #${globalTouchCount}: ${e.target.tagName}`, 'info');
+            }
+        }, { passive: true });
+        
+        document.addEventListener('click', function(e) {
+            globalClickCount++;
+            if (globalClickCount <= 10) { // 只记录前10次
+                log(`全局 click #${globalClickCount}: ${e.target.tagName}`, 'info');
+            }
+        });
+        
+        // 显示初始化完成
+        setTimeout(() => {
+            log('🎮 测试页面初始化完成，请开始测试触摸功能！', 'success');
+            log('💡 提示：如果按钮无法点击，请检查 Android WebView 设置', 'warning');
+        }, 100);
+    </script>
+</body>
+</html> 
