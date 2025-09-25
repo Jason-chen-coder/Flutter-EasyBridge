@@ -52,7 +52,7 @@ class AppCenterPage extends StatelessWidget {
                 key: UniqueKey(),
                 appName: 'online_demo',
                 bridge: AppBridge(),
-                onlineUrl: 'https://baidu.com',
+                onlineUrl: 'https://flutter.dev',
               ),
             ),
       ),

@@ -8,6 +8,21 @@ import 'h5_webview.dart';
 typedef WebViewCreatedCallback =
     void Function(InAppWebViewController controller);
 
+// 消息数据类
+class MessageItem {
+  final String eventName;
+  final String content;
+  final DateTime timestamp;
+  final String direction; // 'h5-to-flutter' or 'flutter-to-h5'
+
+  MessageItem({
+    required this.eventName,
+    required this.content,
+    required this.timestamp,
+    required this.direction,
+  });
+}
+
 class App1H5WebviewDebugPage extends StatefulWidget {
   /// appName should correspond to the folder name under assets/h5, e.g. "app1" or "app2"
   /// The entry point will be assets/h5/<appName>/dist/index.html
@@ -37,17 +52,14 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
   dynamic _lastH5Reply;
   String? _arrowOutMsg; // Flutter -> H5
   String? _arrowInMsg; // H5 -> Flutter
-  // Two message lists with timestamps, similar to H5 app1
-  final List<String> _fromH5Logs = <String>[]; // H5 -> Flutter events/messages
-  final List<String> _h5RepliesLogs =
-      <String>[]; // Flutter -> H5 requests and their replies
+  // Unified message list with timestamps
+  final List<MessageItem> _unifiedMessageLogs = <MessageItem>[];
 
   // Add text controller for input field
   final TextEditingController _messageController = TextEditingController();
 
-  // Scroll controllers for message lists
-  final ScrollController _fromH5ScrollController = ScrollController();
-  final ScrollController _h5RepliesScrollController = ScrollController();
+  // Scroll controller for unified message list
+  final ScrollController _unifiedMessageScrollController = ScrollController();
 
   @override
   void initState() {
@@ -67,11 +79,11 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     return '$y-$m-$d $h:$mi:$s';
   }
 
-  void _appendFromH5(String text) {
+  void _appendMessage(String eventName, String content, String direction) {
     // 检查是否需要自动滚动（只有在接近底部时才滚动）
     bool shouldAutoScroll = false;
-    if (_fromH5ScrollController.hasClients) {
-      final position = _fromH5ScrollController.position;
+    if (_unifiedMessageScrollController.hasClients) {
+      final position = _unifiedMessageScrollController.position;
       // 如果距离底部小于 100 像素，认为用户在底部，需要自动滚动
       shouldAutoScroll = (position.maxScrollExtent - position.pixels) < 100;
     } else {
@@ -80,15 +92,22 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     }
 
     setState(() {
-      _fromH5Logs.add('${_formatTs(DateTime.now())}|$text');
+      _unifiedMessageLogs.add(
+        MessageItem(
+          eventName: eventName,
+          content: content,
+          timestamp: DateTime.now(),
+          direction: direction,
+        ),
+      );
     });
 
     // 只有在需要时才自动滚动到底部
     if (shouldAutoScroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_fromH5ScrollController.hasClients) {
-          _fromH5ScrollController.animateTo(
-            _fromH5ScrollController.position.maxScrollExtent,
+        if (_unifiedMessageScrollController.hasClients) {
+          _unifiedMessageScrollController.animateTo(
+            _unifiedMessageScrollController.position.maxScrollExtent,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
@@ -97,44 +116,13 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     }
   }
 
-  void _appendH5Reply(String text) {
-    // 检查是否需要自动滚动（只有在接近底部时才滚动）
-    bool shouldAutoScroll = false;
-    if (_h5RepliesScrollController.hasClients) {
-      final position = _h5RepliesScrollController.position;
-      // 如果距离底部小于 100 像素，认为用户在底部，需要自动滚动
-      shouldAutoScroll = (position.maxScrollExtent - position.pixels) < 100;
-    } else {
-      // 如果还没有客户端，默认自动滚动
-      shouldAutoScroll = true;
-    }
-
-    setState(() {
-      _h5RepliesLogs.add('${_formatTs(DateTime.now())}|$text');
-    });
-
-    // 只有在需要时才自动滚动到底部
-    if (shouldAutoScroll) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_h5RepliesScrollController.hasClients) {
-          _h5RepliesScrollController.animateTo(
-            _h5RepliesScrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-  }
-
-  Widget _buildMessageItem(String fullMessage, String messageType, Color typeColor) {
-    // Parse the message format: "timestamp|content"
-    final parts = fullMessage.split('|');
-    final timestamp = parts.isNotEmpty ? parts[0] : '';
-    final content = parts.length > 1 ? parts.sublist(1).join('|') : fullMessage;
-    
+  Widget _buildMessageItem(
+    MessageItem messageItem,
+    String messageType,
+    Color typeColor,
+  ) {
     // Determine if it's an error message
-    final isError = content.startsWith('Error:');
+    final isError = messageItem.content.startsWith('Error:');
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -174,13 +162,28 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                   ),
                 ),
               ),
+              SizedBox(width: 8),
+              // 事件名
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Text(
+                  messageItem.eventName,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
+                ),
+              ),
               const Spacer(),
               Text(
-                timestamp,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
-                ),
+                _formatTs(messageItem.timestamp),
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
               ),
             ],
           ),
@@ -193,7 +196,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              content,
+              messageItem.content,
               style: TextStyle(
                 fontSize: 12,
                 color: isError ? Colors.red[700] : Colors.black87,
@@ -211,7 +214,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     // Add page.h5ToFlutter method with debug functionality
     _bridge.register('page.h5ToFlutter', (params) async {
       print('[DEBUG] page.h5ToFlutter called with params: $params');
-      
+
       // Handle different parameter formats
       String message;
       String? from;
@@ -223,29 +226,29 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
       } else {
         message = params?.toString() ?? 'null';
       }
-      
+
       // Create full message with context
       final fullMessage = from != null ? '$message (from: $from)' : message;
-      
+
       print('[DEBUG] Extracted message: $message, from: $from');
-      
+
       // Update UI immediately using setState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
             _arrowInMsg = fullMessage;
           });
-          _appendFromH5(fullMessage);
+          _appendMessage('page.h5ToFlutter', fullMessage, 'h5-to-flutter');
         }
       });
-      
+
       // Create the reply
       final Map<String, Object> reply = {
         'reply': 'Flutter 已收到: $fullMessage',
         'page': 'app1',
         'ts': DateTime.now().millisecondsSinceEpoch,
       };
-      
+
       // Update outgoing message
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -254,25 +257,25 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
           });
         }
       });
-      
+
       print('[DEBUG] Returning reply: $reply');
       return reply;
     });
-    
+
     // Add app.getInfo method with debug functionality
     _bridge.register('app.getInfo', (params) async {
       print('[DEBUG] app.getInfo called with params: $params');
-      
+
       // Update UI to show incoming request
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
             _arrowInMsg = 'Get App Info';
           });
-          _appendFromH5('H5 请求获取 App 信息');
+          _appendMessage('app.getInfo', 'H5 请求获取 App 信息', 'h5-to-flutter');
         }
       });
-      
+
       final info = await PackageInfo.fromPlatform();
       final Map<String, Object?> result = {
         'appName': info.appName,
@@ -282,7 +285,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
         'buildSignature': info.buildSignature,
         'installerStore': info.installerStore,
       };
-      
+
       // Update UI to show outgoing response
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -291,7 +294,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
           });
         }
       });
-      
+
       print('[DEBUG] app.getInfo returning: $result');
       return result;
     });
@@ -302,7 +305,17 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     // Add page.ready event handler
     _bridge.onEvent('page.ready', (payload) {
       debugPrint('App1 - H5 page.ready: $payload');
-      _appendFromH5(payload.toString());
+      _appendMessage('page.ready', payload.toString(), 'h5-to-flutter');
+    });
+
+    // 监听 H5 推送的消息
+    _bridge.onEvent('h5.pushMessage', (payload) {
+      final message =
+          payload is Map && payload['message'] != null
+              ? payload['message'].toString()
+              : payload.toString();
+      debugPrint('App1 - H5 push message: $message');
+      _appendMessage('h5.pushMessage', '推送消息: $message', 'h5-to-flutter');
     });
   }
 
@@ -323,7 +336,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
           _lastH5Reply = res;
           _arrowInMsg = res?.toString();
         });
-        _appendH5Reply(res.toString());
+        _appendMessage('page.echo', res.toString(), 'flutter-to-h5');
         _messageController.clear(); // Clear input after successful send
       }
     } catch (e) {
@@ -332,19 +345,16 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
           _lastH5Reply = {'error': e.toString()};
           _arrowInMsg = 'Error: ${e.toString()}';
         });
-        _appendH5Reply('Error: ${e.toString()}');
+        _appendMessage('page.echo', 'Error: ${e.toString()}', 'flutter-to-h5');
       }
     }
   }
-
-
 
   @override
   void dispose() {
     _bridge.detach(); // 清理外部管理的 bridge
     _messageController.dispose(); // Dispose text controller
-    _fromH5ScrollController.dispose(); // Dispose scroll controllers
-    _h5RepliesScrollController.dispose();
+    _unifiedMessageScrollController.dispose(); // Dispose scroll controller
     super.dispose();
   }
 
@@ -366,68 +376,79 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                     spacing: 8,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text("Flutter 基座",style: TextStyle(fontSize: 28,fontWeight:FontWeight.bold,color: Color(0xFF00D96A) ),),
-                      SizedBox(height: 10,),
                       Text(
-                        '接收 H5 发送的消息',
-                        style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
-                      ),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: _fromH5Logs.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    '暂无消息',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                )
-                              : ListView.builder(
-                                  controller: _fromH5ScrollController,
-                                  padding: const EdgeInsets.all(8),
-                                  itemCount: _fromH5Logs.length,
-                                  itemBuilder: (context, index) {
-                                    final message = _fromH5Logs[index];
-                                    return _buildMessageItem(message, '[H5 → Flutter]', Colors.orange);
-                                  },
-                                ),
+                        "Flutter 基座",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00D96A),
                         ),
                       ),
-                      Text(
-                        '接收 Flutter → H5 后返回的消息',
-                        style: const TextStyle(fontSize: 20,fontWeight: FontWeight.bold),
+                      SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '消息列表',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red[400],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              minimumSize: const Size(60, 32),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _unifiedMessageLogs.clear();
+                              });
+                            },
+                            child: const Text('清空', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
                       ),
                       Expanded(
+                        flex: 2,
                         child: Container(
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey[300]!),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: _h5RepliesLogs.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    '暂无消息',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 14,
+                          child:
+                              _unifiedMessageLogs.isEmpty
+                                  ? const Center(
+                                    child: Text(
+                                      '暂无消息',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                      ),
                                     ),
+                                  )
+                                  : ListView.builder(
+                                    controller: _unifiedMessageScrollController,
+                                    padding: const EdgeInsets.all(8),
+                                    itemCount: _unifiedMessageLogs.length,
+                                    itemBuilder: (context, index) {
+                                      final messageItem = _unifiedMessageLogs[index];
+                                      return _buildMessageItem(
+                                        messageItem,
+                                        messageItem.direction == 'h5-to-flutter' 
+                                            ? '[H5 → Flutter]' 
+                                            : '[Flutter → H5]',
+                                        messageItem.direction == 'h5-to-flutter' 
+                                            ? Colors.orange 
+                                            : Colors.blue,
+                                      );
+                                    },
                                   ),
-                                )
-                              : ListView.builder(
-                                  controller: _h5RepliesScrollController,
-                                  padding: const EdgeInsets.all(8),
-                                  itemCount: _h5RepliesLogs.length,
-                                  itemBuilder: (context, index) {
-                                    final message = _h5RepliesLogs[index];
-                                    return _buildMessageItem(message, '[Flutter → H5]', Colors.blue);
-                                  },
-                                ),
                         ),
                       ),
                       SizedBox(
@@ -453,7 +474,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                                   _lastH5Reply = res;
                                   _arrowInMsg = res?.toString();
                                 });
-                                _appendH5Reply(res.toString());
+                                _appendMessage('h5.getInfo', res.toString(), 'flutter-to-h5');
                               }
                             } catch (e) {
                               if (mounted) {
@@ -461,11 +482,62 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                                   _lastH5Reply = {'error': e.toString()};
                                   _arrowInMsg = 'Error: ${e.toString()}';
                                 });
-                                _appendH5Reply('Error: ${e.toString()}');
+                                _appendMessage(
+                                  'h5.getInfo',
+                                  'Error: ${e.toString()}',
+                                  'flutter-to-h5',
+                                );
                               }
                             }
                           },
                           child: const Text('获取 H5 应用信息'),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 40,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            final message =
+                                'Flutter 推送消息 - ${_formatTs(DateTime.now())}';
+                            try {
+                              await _bridge
+                                  .emitEventToJs('flutter.pushMessage', {
+                                    'message': message,
+                                    'from': 'flutter',
+                                    'timestamp':
+                                        DateTime.now().millisecondsSinceEpoch,
+                                  });
+                              if (mounted) {
+                                setState(() {
+                                  _arrowOutMsg = '已推送: $message';
+                                });
+                                _appendMessage(
+                                  'flutter.pushMessage',
+                                  '已推送: $message',
+                                  'flutter-to-h5',
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                setState(() {
+                                  _arrowOutMsg = 'Error: ${e.toString()}';
+                                });
+                                _appendMessage(
+                                  'flutter.pushMessage',
+                                  'Error: ${e.toString()}',
+                                  'flutter-to-h5',
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('推送消息给 H5'),
                         ),
                       ),
                       Row(
@@ -547,7 +619,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                         softWrap: true,
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -577,14 +648,21 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                     onLoadStop: (url) {
                       // Handle onLoadStop with additional debug functionality
                       // Try calling a JS method to fetch state
-                      _bridge.invokeJs('page.getState').then((state) {
-                        debugPrint('JS page.getState -> $state');
-                        _appendH5Reply(state.toString());
-                      }).catchError((e) {
-                        debugPrint('JS page.getState error -> $e');
-                        _appendH5Reply('Error: ${e.toString()}');
-                      });
-                      
+                      _bridge
+                          .invokeJs('page.getState')
+                          .then((state) {
+                            debugPrint('JS page.getState -> $state');
+                            _appendMessage('page.getState', state.toString(), 'flutter-to-h5');
+                          })
+                          .catchError((e) {
+                            debugPrint('JS page.getState error -> $e');
+                            _appendMessage(
+                              'page.getState',
+                              'Error: ${e.toString()}',
+                              'flutter-to-h5',
+                            );
+                          });
+
                       if (widget.onLoadStop != null) {
                         widget.onLoadStop!(url);
                       }

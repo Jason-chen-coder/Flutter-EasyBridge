@@ -15,14 +15,14 @@
     <main>
       <h1>本地 H5 - 示例应用 A</h1>
       <section class="panel">
-        <h2>接收 H5 → Flutter 后返回的消息</h2>
-        <ul id="flutter-replies-list" class="msg-list"></ul>
-      </section>
-      <section class="panel">
-        <h2>接收 Flutter 发送的消息</h2>
-        <ul id="from-flutter-list" class="msg-list"></ul>
+        <div class="panel-header">
+          <h2>消息列表</h2>
+          <button id="clear-messages-btn" class="clear-btn">清空</button>
+        </div>
+        <ul id="unified-message-list" class="msg-list"></ul>
       </section>
       <button id="get-app-info-btn">获取 App 版本信息</button>
+      <button id="push-to-flutter-btn">推送消息给 Flutter</button>
       <div class="input-row">
         <input id="h5-input" type="text" placeholder="输入要发送给 Flutter 的消息" />
         <button id="send-to-flutter-btn">发送给 Flutter</button>

@@ -49,7 +49,8 @@ class H5WebviewState extends State<H5Webview> {
   Key _webViewKey = UniqueKey();
   String? _initialUrl;
   bool _isLoaded = false;
-  int _progress = 0; // 0-100
+  int _redirectCount = 0;
+  String? _lastUrl;
 
   @override
   void initState() {
@@ -61,8 +62,11 @@ class H5WebviewState extends State<H5Webview> {
     String url;
     
     if (widget.onlineUrl != null) {
-      // Use online URL directly
+      // Use online URL directly and ensure HTTPS
       url = widget.onlineUrl!;
+      if (url.startsWith('http://')) {
+        url = url.replaceFirst('http://', 'https://');
+      }
       print('[H5Webview] Loading online URL: $url');
     } else {
       // Use local assets with localhost server
@@ -111,14 +115,17 @@ class H5WebviewState extends State<H5Webview> {
           initialUrlRequest: URLRequest(
             url: WebUri(_initialUrl!),
           ),
-          initialOptions: InAppWebViewGroupOptions(
-            crossPlatform: InAppWebViewOptions(
-              javaScriptEnabled: true,
-              useOnLoadResource: true,
-            ),
-            ios: IOSInAppWebViewOptions(
-              allowsInlineMediaPlayback: true,
-            ),
+          initialSettings: InAppWebViewSettings(
+            javaScriptEnabled: true,
+            useOnLoadResource: true,
+            useShouldOverrideUrlLoading: true,
+            allowUniversalAccessFromFileURLs: true,
+            allowFileAccessFromFileURLs: true,
+            allowsInlineMediaPlayback: true,
+            useWideViewPort: true,
+            mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+            clearCache: false,
+            cacheEnabled: true,
           ),
           initialUserScripts: UnmodifiableListView<UserScript>([
             widget.bridge.userScript,
@@ -132,16 +139,50 @@ class H5WebviewState extends State<H5Webview> {
             }
           },
           onLoadStart: (c, url) {
+            // 检测重定向循环
+            if (_lastUrl == url?.toString()) {
+              _redirectCount++;
+              if (_redirectCount > 5) {
+                print('[H5Webview] Redirect loop detected, stopping load');
+                _controller?.stopLoading();
+                return;
+              }
+            } else {
+              _redirectCount = 0;
+              _lastUrl = url?.toString();
+            }
+            
             setState(() {
               _isLoaded = false;
-              _progress = 0;
             });
+          },
+          shouldOverrideUrlLoading: (controller, navigationAction) async {
+            final uri = navigationAction.request.url;
+            if (uri != null) {
+              print('[H5Webview] Navigation to: ${uri.toString()}');
+              
+              // 防止HTTP到HTTPS的循环重定向
+              if (_lastUrl != null && 
+                  ((_lastUrl!.startsWith('http://') && uri.toString().startsWith('https://')) ||
+                   (_lastUrl!.startsWith('https://') && uri.toString().startsWith('http://')))) {
+                final httpUrl = _lastUrl!.replaceFirst('https://', '').replaceFirst('http://', '');
+                final newUrl = uri.toString().replaceFirst('https://', '').replaceFirst('http://', '');
+                
+                if (httpUrl == newUrl) {
+                  _redirectCount++;
+                  if (_redirectCount > 3) {
+                    print('[H5Webview] Preventing redirect loop between HTTP/HTTPS');
+                    return NavigationActionPolicy.CANCEL;
+                  }
+                }
+              }
+            }
+            return NavigationActionPolicy.ALLOW;
           },
           onLoadStop: (c, url) async {
             if (mounted) {
               setState(() {
                 _isLoaded = true;
-                _progress = 100;
               });
             }
             if (widget.onLoadStop != null) {
@@ -155,15 +196,6 @@ class H5WebviewState extends State<H5Webview> {
           },
           onConsoleMessage: (controller, consoleMessage) =>
               print('console: ${consoleMessage.message}'),
-          onProgressChanged: (c, progress) {
-            if (mounted) {
-              setState(() => _progress = progress);
-            }
-            if (widget.onProgress != null) {
-              widget.onProgress!(progress);
-            }
-            print('progress $progress');
-          },
         ),
         if (!_isLoaded)
           Container(
@@ -171,25 +203,6 @@ class H5WebviewState extends State<H5Webview> {
             alignment: Alignment.center,
             child: const CircularProgressIndicator(),
           ),
-        // Top progress bar for H5 loading
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedOpacity(
-            opacity: (_progress >= 100) ? 0 : 1,
-            duration: const Duration(milliseconds: 150),
-            child: SizedBox(
-              height: 2,
-              child: LinearProgressIndicator(
-                value: (_progress <= 0 || _progress >= 100)
-                    ? null
-                    : (_progress / 100),
-                backgroundColor: Colors.transparent,
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -197,5 +210,4 @@ class H5WebviewState extends State<H5Webview> {
   // 提供公共接口供外部调用
   InAppWebViewController? get controller => _controller;
   bool get isLoaded => _isLoaded;
-  int get progress => _progress;
-} 
+}
