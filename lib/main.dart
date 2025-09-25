@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_h5/app_center.dart';
+import 'package:easy_bridge/app_center.dart';
 
 void main() {
   runApp(const MyApp());

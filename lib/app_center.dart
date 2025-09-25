@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_h5/utils/app_bridge.dart';
+import 'package:easy_bridge/utils/app_bridge.dart';
 import 'app1_h5_webview_debug_page.dart';
 import 'h5_webview.dart';
 

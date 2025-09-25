@@ -1,4 +1,4 @@
-package com.example.flutter_h5
+package com.example.easy_bridge
 
 import android.os.Build
 import android.webkit.WebView

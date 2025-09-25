@@ -1,32 +1,57 @@
-# Flutter H5 混合开发框架
+# Easy Bridge 
 
-一个基于 Flutter + WebView + 本地 HTTP 服务器的混合开发解决方案，支持 Flutter 基座与 H5 应用之间的双向通信。
+<div align="center">
+  <img src="images/icon.png" alt="Easy Bridge Logo" width="200" style="background-color: white; padding: 20px; border-radius: 10px;" />
+</div>
+
+<div align="center">
+  <a href="README.md">🇨🇳 中文</a> | 
+  <a href="README_EN.md">🇺🇸 English</a>
+</div>
+
+一个基于 Flutter + WebView + 本地 HTTP 服务器的混合开发解决方案，支持 Flutter 基座与 H5 应用之间的双向通信，同时支持本地 H5 应用和在线 URL 加载。
 
 ## 📋 项目概述
 
 该框架提供了一套完整的 Flutter 与 H5 应用交互机制，包括：
 
 - 🔄 **双向通信**: Flutter ↔ H5 方法调用和事件传递
-- 🌐 **本地服务器**: 内置 HTTP 服务器加载本地 H5 资源
+- 🌐 **多源支持**: 本地 H5 应用 + 在线 URL 加载
 - 🔌 **桥接系统**: 基于 AppBridge 的通信桥梁
-- 📱 **响应式 UI**: 实时消息展示和交互界面
+- 🐛 **调试界面**: 实时消息展示和交互测试
 - 🛡️ **类型安全**: 完整的错误处理和超时机制
+- 🔒 **安全防护**: 重定向循环检测和错误恢复
+
+## 📱 项目截图
+
+<div align="center">
+  <img src="images/app.png" alt="Easy Bridge 应用截图" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <p><em>应用主界面展示 - Flutter 基座与 H5 应用的双向通信调试界面</em></p>
+</div>
 
 ## 🏗️ 项目结构
 
 ```
-flutter_h5/
+easy_bridge/
 ├── lib/
-│   ├── local_h5_webview.dart          # 可复用的 H5 WebView 组件
+│   ├── main.dart                      # 应用入口
+│   ├── app_center.dart                # 应用中心页面
+│   ├── h5_webview.dart                # 统一的 H5 WebView 组件
+│   ├── app1_h5_webview_debug_page.dart # App1 调试页面
 │   └── utils/
 │       ├── app_bridge.dart            # 核心桥接器
 │       └── localhost_server_manager.dart # 本地服务器管理
 ├── assets/h5/                         # H5 应用资源
-│   └── app1/                          # 示例 H5 应用
-│       └── dist/                      # 构建输出目录
-│           ├── index.html             # 主页面
-│           ├── app.js                 # JavaScript 逻辑
-│           └── style.css              # 样式文件
+│   ├── app1/                          # 示例应用 A
+│   │   └── dist/                      # 构建输出目录
+│   │       ├── index.html             # 主页面
+│   │       ├── app.js                 # JavaScript 逻辑
+│   │       └── style.css              # 样式文件
+│   └── app2/                          # 示例应用 B
+│       └── dist/
+│           ├── index.html
+│           ├── app.js
+│           └── style.css
 └── README.md                          # 本文档
 ```
 
@@ -34,19 +59,24 @@ flutter_h5/
 
 ### 1. 基本用法
 
+#### 本地 H5 应用
+
 ```dart
 import 'package:flutter/material.dart';
-import 'local_h5_webview.dart';
+import 'h5_webview.dart';
+import 'utils/app_bridge.dart';
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        body: LocalH5WebView(
+        appBar: AppBar(title: Text('本地 H5 应用')),
+        body: H5Webview(
           appName: 'app1',  // 对应 assets/h5/app1/dist/index.html
-          onWebViewCreated: (controller) {
-            print('WebView 创建完成');
+          bridge: AppBridge(),
+          onLoadStop: (url) {
+            print('页面加载完成: $url');
           },
         ),
       ),
@@ -55,12 +85,33 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-### 2. 创建新的 H5 应用
+#### 在线 URL 加载
 
-在 `assets/h5/` 下创建新目录，如 `app2/`：
+```dart
+H5Webview(
+  appName: 'online_demo',     // 用作标识符
+  onlineUrl: 'https://flutter.dev',  // 在线 URL
+  bridge: AppBridge(),
+  onLoadStop: (url) {
+    print('在线页面加载完成: $url');
+  },
+)
+```
+
+### 2. 应用中心使用
+
+运行应用后，您将看到应用中心页面，提供了三个示例：
+
+- **示例应用 A (本地)**: 带完整调试界面的本地 H5 应用
+- **示例应用 B (本地)**: 简单的本地 H5 应用
+- **在线应用示例**: 加载在线 URL 的示例
+
+### 3. 创建新的 H5 应用
+
+在 `assets/h5/` 下创建新目录，如 `myapp/`：
 
 ```
-assets/h5/app2/
+assets/h5/myapp/
 └── dist/              # 构建输出目录
     ├── index.html     # 必需：主页面（固定入口文件）
     ├── app.js         # 建议：JavaScript 逻辑
@@ -69,15 +120,17 @@ assets/h5/app2/
 
 ## 🔧 核心组件
 
-### LocalH5WebView
+### H5Webview
 
-可复用的 WebView 组件，负责加载和显示 H5 应用。
+统一的 WebView 组件，支持本地 H5 应用和在线 URL 加载。
 
 **参数说明：**
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `appName` | `String` | 必需 | H5 应用目录名，对应 `assets/h5/<appName>/dist/`，入口文件固定为 `index.html` |
+| `appName` | `String` | 必需 | H5 应用标识符。本地模式对应 `assets/h5/<appName>/dist/`；在线模式作为标识符 |
+| `onlineUrl` | `String?` | `null` | 在线 URL。如果提供，将忽略 `appName` 对应的本地资源 |
+| `bridge` | `AppBridge` | 必需 | 桥接器实例，用于 Flutter 与 H5 通信 |
 | `onWebViewCreated` | `WebViewCreatedCallback?` | `null` | WebView 创建回调 |
 | `onLoadStop` | `Function(String)?` | `null` | 页面加载完成回调 |
 | `onLoadError` | `Function(String, int, String)?` | `null` | 页面加载错误回调 |
@@ -102,6 +155,35 @@ assets/h5/app2/
 - 支持多种静态资源类型
 - 开发模式下的调试日志
 - 单例模式，避免重复启动
+
+## 🐛 调试功能
+
+### App1H5WebviewDebugPage
+
+专门的调试页面，提供完整的双向通信测试界面：
+
+**界面布局：**
+- **左侧：Flutter 基座**
+  - 统一消息列表（支持自动/手动滚动）
+  - 清空消息按钮
+  - "获取 H5 应用信息" 按钮
+  - "推送消息给 H5" 按钮
+  - 自定义消息输入框
+
+- **中间：交互指示器**
+  - 蓝色右箭头：Flutter → H5 的消息
+  - 绿色左箭头：H5 → Flutter 的消息
+  - 实时显示当前传输的消息内容
+
+- **右侧：H5 应用**
+  - 完整的 H5 应用界面
+  - 与 Flutter 的实时交互
+
+**调试特性：**
+- 消息自动追踪和记录
+- 错误高亮显示
+- 时间戳和方向标识
+- 智能滚动（接近底部时自动滚动）
 
 ## 📡 通信协议
 
@@ -131,6 +213,8 @@ window.AppBridge.register('h5.getInfo', async function() {
     page: 'app1',
     name: document.title,
     version: '1.0.0',
+    userAgent: navigator.userAgent,
+    href: location.href,
     ts: Date.now()
   };
 });
@@ -139,6 +223,7 @@ window.AppBridge.register('page.echo', async function(params) {
   const message = params.message;
   return {
     reply: 'H5 已收到: ' + message,
+    page: 'app1',
     ts: Date.now()
   };
 });
@@ -170,15 +255,28 @@ _bridge.register('app.getInfo', (params) async {
   final info = await PackageInfo.fromPlatform();
   return {
     'appName': info.appName,
+    'packageName': info.packageName,
     'version': info.version,
     'buildNumber': info.buildNumber,
+    'buildSignature': info.buildSignature,
+    'installerStore': info.installerStore,
   };
 });
 
 _bridge.register('page.h5ToFlutter', (params) async {
-  final message = params['message']?.toString() ?? '';
+  String message;
+  String? from;
+  if (params is Map) {
+    message = params['message']?.toString() ?? 'No message';
+    from = params['from']?.toString();
+  } else {
+    message = params?.toString() ?? 'null';
+  }
+  
+  final fullMessage = from != null ? '$message (from: $from)' : message;
   return {
-    'reply': 'Flutter 已收到: $message',
+    'reply': 'Flutter 已收到: $fullMessage',
+    'page': 'app1',
     'ts': DateTime.now().millisecondsSinceEpoch,
   };
 });
@@ -192,16 +290,22 @@ _bridge.register('page.h5ToFlutter', (params) async {
 
 ```dart
 // 发送事件到 H5（无需等待返回）
-await _bridge.emitEventToJs('user.login', {'userId': 123});
+await _bridge.emitEventToJs('flutter.pushMessage', {
+  'message': 'Flutter 推送消息',
+  'from': 'flutter',
+  'timestamp': DateTime.now().millisecondsSinceEpoch,
+});
 ```
 
 **H5 监听事件：**
 
 ```javascript
 // 监听 Flutter 发送的事件
-
-window.AppBridge.on('user.login', function(payload) {
-  console.log('用户登录:', payload.userId);
+window.AppBridge.on('flutter.pushMessage', function(payload) {
+  console.log('收到 Flutter 推送:', payload.message);
+  // 更新 UI 显示推送消息
+  document.getElementById('flutter-messages').innerHTML += 
+    `<div>Flutter: ${payload.message}</div>`;
 });
 ```
 
@@ -211,8 +315,16 @@ window.AppBridge.on('user.login', function(payload) {
 
 ```javascript
 // 发送事件到 Flutter（无需等待返回）
-window.AppBridge.emit('page.ready', { ts: Date.now(), page: 'app1' });
-window.AppBridge.emit('user.action', { action: 'click', target: 'button1' });
+window.AppBridge.emit('page.ready', { 
+  ts: Date.now(), 
+  page: 'app1' 
+});
+
+window.AppBridge.emit('h5.pushMessage', {
+  message: 'H5 推送消息',
+  from: 'h5',
+  timestamp: Date.now()
+});
 ```
 
 **Flutter 监听事件：**
@@ -223,8 +335,11 @@ _bridge.onEvent('page.ready', (payload) {
   print('H5 页面准备完成: $payload');
 });
 
-_bridge.onEvent('user.action', (payload) {
-  print('用户操作: ${payload['action']}');
+_bridge.onEvent('h5.pushMessage', (payload) {
+  final message = payload is Map && payload['message'] != null
+      ? payload['message'].toString()
+      : payload.toString();
+  print('收到 H5 推送消息: $message');
 });
 ```
 
@@ -235,8 +350,7 @@ _bridge.onEvent('user.action', (payload) {
 | 方法名 | 参数 | 返回值 | 说明 |
 |--------|------|--------|------|
 | `page.h5ToFlutter` | `{message: string, from?: string}` | `{reply: string, page: string, ts: number}` | 接收 H5 消息并回复 |
-| `app.getInfo` | - | `{appName, packageName, version, buildNumber, ...}` | 获取 Flutter 应用信息 |
-| `bridge.getCapabilities` | - | `{version, methods, features}` | 获取桥接器能力 |
+| `app.getInfo` | - | `{appName, packageName, version, buildNumber, buildSignature, installerStore}` | 获取 Flutter 应用信息 |
 
 ### H5 端提供的方法
 
@@ -252,59 +366,41 @@ _bridge.onEvent('user.action', (payload) {
 
 | 事件名 | 数据格式 | 说明 |
 |--------|----------|------|
-| `user.login` | `{userId: number, username: string}` | 用户登录状态 |
+| `flutter.pushMessage` | `{message: string, from: string, timestamp: number}` | Flutter 推送消息 |
 
 #### H5 → Flutter 事件
 
 | 事件名 | 数据格式 | 说明 |
 |--------|----------|------|
 | `page.ready` | `{ts: number, page: string}` | 页面加载完成 |
-| `user.action` | `{action: string, target: string, data?: any}` | 用户操作事件 |
+| `h5.pushMessage` | `{message: string, from?: string, timestamp?: number}` | H5 推送消息 |
 
-## 🚦 生命周期
+## 🔒 安全与错误处理
 
-### 1. 初始化流程
+### 重定向循环防护
 
+针对在线 URL 可能出现的重定向问题，框架提供了多层防护：
+
+```dart
+// 重定向计数检测
+if (_lastUrl == url?.toString()) {
+  _redirectCount++;
+  if (_redirectCount > 5) {
+    print('[H5Webview] Redirect loop detected, stopping load');
+    _controller?.stopLoading();
+    return;
+  }
+}
+
+// HTTP/HTTPS 循环检测
+shouldOverrideUrlLoading: (controller, navigationAction) async {
+  // 防止 HTTP 到 HTTPS 的循环重定向
+  if (循环条件) {
+    return NavigationActionPolicy.CANCEL;
+  }
+  return NavigationActionPolicy.ALLOW;
+}
 ```
-1. Flutter 启动本地 HTTP 服务器
-   └── LocalhostServerManager.start()
-   
-2. WebView 组件初始化
-   └── LocalH5WebView 创建
-   
-3. 加载 H5 应用
-   └── http://127.0.0.1:PORT/<appName>/dist/index.html
-   
-4. 注入 AppBridge JavaScript SDK
-   └── window.AppBridge 可用
-   
-5. 双向注册方法和事件监听器
-   ├── Flutter: _bridge.register() / _bridge.onEvent()
-   └── H5: AppBridge.register() / AppBridge.on()
-   
-6. H5 页面就绪
-   └── H5 发送 page.ready 事件
-   
-7. Flutter 响应并建立连接
-   └── 调用 page.getState 获取初始状态
-```
-
-### 2. 运行时交互
-
-```
-用户操作 → 方法调用/事件发送 → 对端处理 → 返回结果/触发监听器
-```
-
-### 3. 清理流程
-
-```
-1. 组件销毁时调用 dispose()
-2. _bridge.detach() - 分离桥接器
-3. _controller?.dispose() - 释放 WebView 控制器
-4. 清理资源和监听器
-```
-
-## 🔒 错误处理
 
 ### 超时机制
 
@@ -324,106 +420,61 @@ try {
 
 - JavaScript 错误会传播到 Flutter 端
 - Flutter 错误会传播到 H5 端
+- 调试界面中错误消息会高亮显示
 - 所有错误都包含详细的错误信息和堆栈跟踪
-
-### 错误处理示例
-
-**Flutter 端：**
-
-```dart
-try {
-  final result = await _bridge.invokeJs('nonexistent.method');
-} catch (e) {
-  // 处理错误
-  setState(() {
-    _errorMessage = '调用失败: $e';
-  });
-}
-```
-
-**H5 端：**
-
-```javascript
-try {
-  const result = await window.AppBridge.invoke('nonexistent.method');
-} catch (error) {
-  console.error('调用失败:', error.message);
-  // 显示错误信息给用户
-}
-```
-
-## 🎨 UI 界面说明
-
-应用界面采用左中右三栏布局：
-
-### 左侧：Flutter 基座
-- **接收 H5 消息区域**: 显示 H5 主动发送的消息和事件
-- **接收 Flutter→H5 回复区域**: 显示 Flutter 调用 H5 方法后的返回结果
-- **操作按钮**:
-  - "获取 H5 应用信息" - 调用 `h5.getInfo`
-  - "发送给H5" - 发送自定义消息到 H5
-
-### 中间：交互指示器
-- **蓝色右箭头**: Flutter → H5 的消息
-- **绿色左箭头**: H5 → Flutter 的消息
-- **实时显示当前传输的消息内容**
-
-### 右侧：H5 应用
-- **完整的 H5 应用界面**
-- **消息展示区域**: 显示与 Flutter 的交互记录
-- **操作按钮**:
-  - "获取 App 版本信息" - 调用 Flutter 的 `app.getInfo`
-  - "发送给 Flutter" - 发送自定义消息到 Flutter
 
 ## 🔧 开发指南
 
-### 添加新的方法
+### 添加新的应用页面
 
-**1. Flutter 端添加方法：**
-
-```dart
-_bridge.register('custom.method', (params) async {
-  // 处理逻辑
-  return {'result': 'success'};
-});
-```
-
-**2. H5 端调用：**
-
-```javascript
-const result = await window.AppBridge.invoke('custom.method', {
-  param1: 'value1'
-});
-```
-
-### 添加新的事件
-
-**1. 定义事件监听器：**
+**1. 在应用中心添加新项：**
 
 ```dart
-// Flutter 端
-_bridge.onEvent('custom.event', (payload) {
-  print('收到自定义事件: $payload');
-});
+// lib/app_center.dart
+AppItem(
+  title: '新应用',
+  icon: Icons.new_app,
+  builder: (context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: AppBar(backgroundColor: Colors.white),
+    body: H5Webview(
+      key: UniqueKey(),
+      appName: 'newapp',
+      bridge: AppBridge(),
+      // 可选：添加在线 URL
+      // onlineUrl: 'https://example.com',
+    ),
+  ),
+)
 ```
 
-```javascript
-// H5 端
-window.AppBridge.on('custom.event', function(payload) {
-  console.log('收到自定义事件:', payload);
-});
-```
+### 创建带调试功能的页面
 
-**2. 发送事件：**
+参考 `App1H5WebviewDebugPage` 创建新的调试页面：
 
 ```dart
-// Flutter 发送
-await _bridge.emitEventToJs('custom.event', {'data': 'value'});
-```
+class MyAppDebugPage extends StatefulWidget {
+  final String appName;
+  
+  const MyAppDebugPage({Key? key, required this.appName}) : super(key: key);
+  
+  @override
+  _MyAppDebugPageState createState() => _MyAppDebugPageState();
+}
 
-```javascript
-// H5 发送
-window.AppBridge.emit('custom.event', {data: 'value'});
+class _MyAppDebugPageState extends State<MyAppDebugPage> {
+  final AppBridge _bridge = AppBridge();
+  final List<MessageItem> _messageLog = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    _setupBridgeMethods();
+    _setupBridgeEvents();
+  }
+  
+  // 设置方法和事件监听...
+}
 ```
 
 ### 创建新的 H5 应用
@@ -452,7 +503,8 @@ assets/h5/myapp/
   <body>
     <main>
       <h1>我的 H5 应用</h1>
-      <!-- 应用内容 -->
+      <div id="flutter-messages"></div>
+      <button onclick="sendToFlutter()">发送消息给 Flutter</button>
     </main>
     <script src="app.js"></script>
   </body>
@@ -466,8 +518,21 @@ document.addEventListener('DOMContentLoaded', function () {
   // 等待 AppBridge 就绪
   if (window.AppBridge) {
     // 注册方法
-    window.AppBridge.register('myapp.getData', async function() {
-      return { data: 'Hello from MyApp' };
+    window.AppBridge.register('h5.getInfo', async function() {
+      return {
+        page: 'myapp',
+        name: document.title,
+        version: '1.0.0',
+        userAgent: navigator.userAgent,
+        href: location.href,
+        ts: Date.now()
+      };
+    });
+    
+    // 监听 Flutter 事件
+    window.AppBridge.on('flutter.pushMessage', function(payload) {
+      document.getElementById('flutter-messages').innerHTML += 
+        `<div>Flutter: ${payload.message}</div>`;
     });
     
     // 发送就绪事件
@@ -477,12 +542,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 });
-```
 
-**4. 在 Flutter 中使用：**
-
-```dart
-LocalH5WebView(appName: 'myapp')
+function sendToFlutter() {
+  if (window.AppBridge) {
+    window.AppBridge.invoke('page.h5ToFlutter', {
+      message: '来自 MyApp 的消息',
+      from: 'myapp'
+    }).then(result => {
+      console.log('Flutter 回复:', result);
+    });
+  }
+}
 ```
 
 ## 🔧 平台配置
@@ -522,27 +592,9 @@ LocalH5WebView(appName: 'myapp')
 </dict>
 ```
 
-**配置说明：**
-- `NSAllowsArbitraryLoadsInWebContent`: 允许 WebView 加载任意内容
-- `NSAllowsLocalNetworking`: 允许本地网络连接
-- `NSExceptionDomains`: 为 localhost 和 127.0.0.1 添加 HTTP 加载异常
-
 #### 2. 沙盒权限配置
 
-在 `macos/Runner/DebugProfile.entitlements` 中添加：
-
-```xml
-<key>com.apple.security.app-sandbox</key>
-<true/>
-<key>com.apple.security.cs.allow-jit</key>
-<true/>
-<key>com.apple.security.network.server</key>
-<true/>
-<key>com.apple.security.network.client</key>
-<true/>
-```
-
-在 `macos/Runner/Release.entitlements` 中添加：
+在 `macos/Runner/DebugProfile.entitlements` 和 `macos/Runner/Release.entitlements` 中添加：
 
 ```xml
 <key>com.apple.security.app-sandbox</key>
@@ -552,32 +604,6 @@ LocalH5WebView(appName: 'myapp')
 <key>com.apple.security.network.client</key>
 <true/>
 ```
-
-**权限说明：**
-- `com.apple.security.app-sandbox`: 启用应用沙盒
-- `com.apple.security.cs.allow-jit`: 允许 JIT 编译（调试模式需要）
-- `com.apple.security.network.server`: 允许作为网络服务器运行
-- `com.apple.security.network.client`: 允许网络客户端连接
-
-#### 3. 配置验证
-
-运行应用前，请确认：
-
-1. ✅ Info.plist 中已添加 NSAppTransportSecurity 配置
-2. ✅ entitlements 文件中已添加网络权限
-3. ✅ WebView 能成功加载 `http://127.0.0.1:PORT/app1/dist/index.html`
-4. ✅ 控制台无网络相关错误信息
-
-#### 4. 常见问题
-
-**Q: 出现 "App Transport Security" 错误**
-A: 检查 Info.plist 中的 NSAppTransportSecurity 配置是否正确
-
-**Q: 本地服务器无法启动**
-A: 确认 entitlements 文件中已添加 `com.apple.security.network.server` 权限
-
-**Q: WebView 无法加载本地内容**
-A: 验证 `NSAllowsLocalNetworking` 和本地域名异常配置是否正确
 
 ## 📦 依赖项
 
@@ -592,7 +618,9 @@ dependencies:
 
 flutter:
   assets:
-    - assets/h5/<appName>/dist/
+    - assets/h5/app1/dist/
+    - assets/h5/app2/dist/
+    # 添加新应用时，需要在这里添加对应的资源路径
 ```
 
 ## 🐛 常见问题
@@ -600,14 +628,17 @@ flutter:
 ### Q: H5 页面加载失败？
 A: 检查 `assets/h5/<appName>/dist/index.html` 目录结构和文件是否存在，确保 `flutter_inappwebview` 依赖已正确安装。
 
+### Q: 在线 URL 无限重定向？
+A: 框架已内置重定向循环检测，会自动停止循环重定向。检查控制台日志了解详细信息。
+
 ### Q: AppBridge 未定义？
 A: 确保在 HTML 中的 JavaScript 代码在 `DOMContentLoaded` 事件中执行，并检查 AppBridge 是否已注入。
 
 ### Q: 方法调用超时？
 A: 检查方法名是否正确注册，参数格式是否匹配，H5 端的异步方法是否正确返回。
 
-### Q: 事件监听不生效？
-A: 确保事件监听器在发送事件之前就已注册，检查事件名是否完全匹配。
+### Q: 调试界面消息不显示？
+A: 确保使用 `App1H5WebviewDebugPage` 或类似的调试页面，普通的 `H5Webview` 不包含调试界面。
 
 ## 📄 许可证
 
@@ -620,11 +651,14 @@ A: 确保事件监听器在发送事件之前就已注册，检查事件名是�
 ---
 
 **🎯 快速上手建议：**
-1. 先运行示例应用了解基本功能
-2. 查看 `assets/h5/app1/dist/` 的代码实现
-3. 参考 API 清单添加自己的方法和事件
-4. 创建新的 H5 应用进行实践
+1. 运行应用，体验应用中心的三个示例
+2. 重点体验 "示例应用 A (本地)" 的完整调试功能
+3. 查看 `assets/h5/app1/dist/` 的代码实现
+4. 参考 API 清单添加自己的方法和事件
+5. 创建新的 H5 应用进行实践
 
-## TODO
-1.windows平台支持
-2.H5 和app 单向通信示例
+## TODO List
+1. Windows 平台支持
+2. 更多在线 URL 兼容性优化
+3. 性能监控和分析工具
+4. H5 应用热重载支持
