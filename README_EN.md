@@ -9,6 +9,14 @@
   <a href="README_EN.md">🇺🇸 English</a>
 </div>
 
+## 🖥️ Platform Support
+
+| Platform | Status |
+|----------|--------|
+| Windows  | ✅ Supported |
+| macOS    | ✅ Supported |
+| Android  | ✅ Supported |
+
 A hybrid development solution based on Flutter + WebView + local HTTP server, supporting bidirectional communication between Flutter host and H5 applications, with support for both local H5 apps and online URL loading.
 
 ## 📋 Project Overview
@@ -658,7 +666,6 @@ Issues and Pull Requests are welcome to help improve this project!
 5. Create new H5 applications for practice
 
 ## TODO List
-1. Windows platform support
-2. More online URL compatibility optimizations
-3. Performance monitoring and analysis tools
-4. H5 application hot reload support 
+1. More online URL compatibility optimizations
+2. Performance monitoring and analysis tools
+3. H5 application hot reload support 
