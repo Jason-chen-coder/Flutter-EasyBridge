@@ -563,6 +563,161 @@ function sendToFlutter() {
 }
 ```
 
+## 📲 Application Integration Guide
+
+Easy Bridge supports three integration methods. The system automatically aggregates applications from all sources and displays them in the application center.
+
+### Integration Methods Overview
+
+| Integration Method | Use Case | Advantages | Disadvantages |
+|-------------------|----------|------------|---------------|
+| **Local Apps** | Built-in apps, example apps | Ships with app, fast loading | Requires new release to update |
+| **Cached Apps** | Dynamically downloaded apps | Supports hot updates, flexible deployment | Requires initial download |
+| **Online Apps** | Third-party websites, external services | Real-time updates, no packaging needed | Network dependent, slower loading |
+
+### Method 1: Local App Integration
+
+#### Directory Structure
+
+```
+assets/h5/your-app/
+├── manifest.json          # App configuration (required)
+├── icon.png              # App icon 512x512 (required)
+└── dist/
+    └── index.html        # Entry file (required)
+```
+
+#### manifest.json Configuration
+
+```json
+{
+  "appId": "your-unique-app-id",
+  "name": "Your App Name",
+  "version": "1.0.0",
+  "description": "App description",
+  "icon": "icon.png"
+}
+```
+
+**Field Descriptions:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `appId` | String | ✅ | Unique app identifier, UUID recommended |
+| `name` | String | ✅ | App display name |
+| `version` | String | ✅ | App version number |
+| `description` | String | ✅ | App description |
+| `icon` | String | ✅ | App icon filename (relative path) |
+
+#### Register App
+
+Modify the `_handleGetLocalApps` method in `lib/app_center.dart`:
+
+```dart
+_handleGetLocalApps([
+  'debugger-app',
+  'vue-app',
+  'your-app',  // Add your app name
+])
+```
+
+#### Configure Assets
+
+Add to `pubspec.yaml`:
+
+```yaml
+flutter:
+  assets:
+    - assets/h5/your-app/dist/
+    - assets/h5/your-app/icon.png
+    - assets/h5/your-app/manifest.json
+```
+
+### Method 2: Cached App Integration
+
+#### App Storage Location
+
+The system automatically scans the `{ApplicationSupportDirectory}/h5/` directory:
+
+```
+{ApplicationSupportDirectory}/h5/your-app/
+├── manifest.json          # App configuration (required)
+├── icon.png              # App icon 512x512 (required)
+└── dist/
+    └── index.html        # Entry file (required)
+```
+
+The manifest.json format is identical to local apps and must include the five required fields: `appId`, `name`, `version`, `description`, and `icon`.
+
+**Get Path:**
+
+```dart
+import 'package:path_provider/path_provider.dart';
+
+final appSupportDir = await getApplicationSupportDirectory();
+// macOS: ~/Library/Application Support/com.example.easyBridge/
+```
+
+#### Download App Example
+
+Simply copy the app files to the corresponding directory, and the system will automatically load them.
+
+### Method 3: Online App Integration
+
+#### Configuration Format
+
+Online app configuration is stored in `SharedPreferences` with the key `online_apps_config`:
+
+```json
+[
+  {
+    "id": "your-website",
+    "name": "Your Website",
+    "version": "1.0.0",
+    "description": "Website description",
+    "iconUrl": "https://your-site.com/icon.png",
+    "url": "https://your-site.com"
+  }
+]
+```
+
+**Field Descriptions:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | String | ✅ | Unique app identifier |
+| `name` | String | ✅ | App display name |
+| `version` | String | ✅ | App version number |
+| `description` | String | ✅ | App description |
+| `iconUrl` | String | ✅ | App icon URL |
+| `url` | String | ✅ | App access URL |
+
+#### Add Online App
+
+```dart
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+
+final prefs = await SharedPreferences.getInstance();
+String? jsonString = prefs.getString('online_apps_config');
+List<dynamic> apps = jsonString != null ? json.decode(jsonString) : [];
+
+apps.add({
+  'id': 'my-website',           // Required: unique identifier
+  'name': 'My Website',          // Required: app name
+  'version': '1.0.0',            // Required: version number
+  'description': 'Website description',  // Required: app description
+  'iconUrl': 'https://mywebsite.com/icon.png',  // Required: icon URL
+  'url': 'https://mywebsite.com',  // Required: access URL
+});
+
+await prefs.setString('online_apps_config', json.encode(apps));
+```
+
+### App Loading Priority
+
+The system loads all three types of apps in parallel. Display order: **Cached Apps** → **Local Apps** → **Online Apps**
+
 ## 🔧 Platform Configuration
 
 ### macOS Configuration

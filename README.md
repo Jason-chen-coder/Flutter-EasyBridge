@@ -563,6 +563,161 @@ function sendToFlutter() {
 }
 ```
 
+## 📲 应用接入指南
+
+Easy Bridge 支持三种应用接入方式，系统会自动聚合所有来源的应用并在应用中心展示。
+
+### 接入方式概览
+
+| 接入方式 | 适用场景 | 优点 | 缺点 |
+|---------|---------|------|------|
+| **本地应用** | 内置应用、示例应用 | 随应用发布、加载快速 | 需要重新发版才能更新 |
+| **缓存应用** | 动态下载的应用 | 支持热更新、灵活部署 | 首次需要下载 |
+| **在线应用** | 第三方网站、外部服务 | 实时更新、无需打包 | 依赖网络、加载较慢 |
+
+### 方式一：本地应用接入
+
+#### 目录结构
+
+```
+assets/h5/your-app/
+├── manifest.json          # 应用配置（必需）
+├── icon.png              # 应用图标 512x512（必需）
+└── dist/
+    └── index.html        # 入口文件（必需）
+```
+
+#### manifest.json 配置
+
+```json
+{
+  "appId": "your-unique-app-id",
+  "name": "你的应用名称",
+  "version": "1.0.0",
+  "description": "应用描述",
+  "icon": "icon.png"
+}
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `appId` | String | ✅ | 应用唯一标识符，建议使用 UUID |
+| `name` | String | ✅ | 应用显示名称 |
+| `version` | String | ✅ | 应用版本号 |
+| `description` | String | ✅ | 应用描述信息 |
+| `icon` | String | ✅ | 应用图标文件名（相对路径） |
+
+#### 注册应用
+
+修改 `lib/app_center.dart` 的 `_handleGetLocalApps` 方法：
+
+```dart
+_handleGetLocalApps([
+  'debugger-app',
+  'vue-app',
+  'your-app',  // 添加你的应用名称
+])
+```
+
+#### 配置资源
+
+在 `pubspec.yaml` 中添加：
+
+```yaml
+flutter:
+  assets:
+    - assets/h5/your-app/dist/
+    - assets/h5/your-app/icon.png
+    - assets/h5/your-app/manifest.json
+```
+
+### 方式二：缓存应用接入
+
+#### 应用存放位置
+
+系统会自动扫描 `{ApplicationSupportDirectory}/h5/` 目录：
+
+```
+{ApplicationSupportDirectory}/h5/your-app/
+├── manifest.json          # 应用配置（必需）
+├── icon.png              # 应用图标 512x512（必需）
+└── dist/
+    └── index.html        # 入口文件（必需）
+```
+
+manifest.json 格式与本地应用相同，需包含 `appId`、`name`、`version`、`description`、`icon` 五个必填字段。
+
+**获取路径：**
+
+```dart
+import 'package:path_provider/path_provider.dart';
+
+final appSupportDir = await getApplicationSupportDirectory();
+// macOS: ~/Library/Application Support/com.example.easyBridge/
+```
+
+#### 下载应用示例
+
+将应用文件复制到对应目录即可，系统会自动加载。
+
+### 方式三：在线应用接入
+
+#### 配置格式
+
+在线应用配置存储在 `SharedPreferences` 中，key 为 `online_apps_config`：
+
+```json
+[
+  {
+    "id": "your-website",
+    "name": "你的网站",
+    "version": "1.0.0",
+    "description": "网站描述",
+    "iconUrl": "https://your-site.com/icon.png",
+    "url": "https://your-site.com"
+  }
+]
+```
+
+**字段说明：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | String | ✅ | 应用唯一标识符 |
+| `name` | String | ✅ | 应用显示名称 |
+| `version` | String | ✅ | 应用版本号 |
+| `description` | String | ✅ | 应用描述信息 |
+| `iconUrl` | String | ✅ | 应用图标 URL |
+| `url` | String | ✅ | 应用访问地址 |
+
+#### 添加在线应用
+
+```dart
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+
+final prefs = await SharedPreferences.getInstance();
+String? jsonString = prefs.getString('online_apps_config');
+List<dynamic> apps = jsonString != null ? json.decode(jsonString) : [];
+
+apps.add({
+  'id': 'my-website',           // 必填：唯一标识符
+  'name': '我的网站',            // 必填：应用名称
+  'version': '1.0.0',           // 必填：版本号
+  'description': '网站描述',     // 必填：应用描述
+  'iconUrl': 'https://mywebsite.com/icon.png',  // 必填：图标URL
+  'url': 'https://mywebsite.com',  // 必填：访问地址
+});
+
+await prefs.setString('online_apps_config', json.encode(apps));
+```
+
+### 应用加载优先级
+
+系统并行加载三种应用，展示顺序：**缓存应用** → **本地应用** → **在线应用**
+
 ## 🔧 平台配置
 
 ### macOS 配置

@@ -5,7 +5,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'utils/localhost_server_manager.dart';
 import 'utils/app_bridge.dart';
 
-typedef WebViewCreatedCallback = void Function(InAppWebViewController controller);
+typedef WebViewCreatedCallback =
+    void Function(InAppWebViewController controller);
 
 class H5Webview extends StatefulWidget {
   /// appName should correspond to the folder name under assets/h5, e.g. "app1" or "app2"
@@ -22,21 +23,28 @@ class H5Webview extends StatefulWidget {
   /// This allows external control over bridge methods and events
   final AppBridge bridge;
 
+  /// Optional hero tag for shared element transition
+  /// If provided, the loading progress indicator will be wrapped in a Hero widget
+  final String heroTag;
+
+  /// Optional hero icon for shared element transition
+  /// If provided along with heroTag, this icon will be displayed during loading
+  final Widget heroIcon;
+
   final WebViewCreatedCallback? onWebViewCreated;
   final void Function(String url)? onLoadStop;
   final void Function(String url, int code, String message)? onLoadError;
-  final void Function(int progress)? onProgress;
-
 
   const H5Webview({
     Key? key,
     required this.appName,
     required this.bridge,
     this.onlineUrl,
+    required this.heroTag,
+    required this.heroIcon,
     this.onWebViewCreated,
     this.onLoadStop,
     this.onLoadError,
-    this.onProgress,
   }) : super(key: key);
 
   @override
@@ -48,6 +56,7 @@ class H5WebviewState extends State<H5Webview> {
   InAppWebViewController? _controller;
   Key _webViewKey = UniqueKey();
   String? _initialUrl;
+  int _progress = 0;
   bool _isLoaded = false;
   int _redirectCount = 0;
   String? _lastUrl;
@@ -55,31 +64,28 @@ class H5WebviewState extends State<H5Webview> {
   @override
   void initState() {
     super.initState();
-      _startServerAndLoad();
+    _startServerAndLoad();
   }
 
   Future<void> _startServerAndLoad() async {
     String url;
-    
     if (widget.onlineUrl != null) {
       // Use online URL directly and ensure HTTPS
       url = widget.onlineUrl!;
-      if (url.startsWith('http://')) {
-        url = url.replaceFirst('http://', 'https://');
-      }
       print('[H5Webview] Loading online URL: $url');
     } else {
       // Use local assets with localhost server
-      final baseUrl = await _serverManager.start(documentRoot: 'assets/h5');
-      
+      url = await _serverManager.start(documentRoot: 'assets/h5');
+
       // Try to find index.html in the dist subdirectory first, then fallback to app directory
       String path = '/${widget.appName}/dist/index.html';
-      
-      url = '$baseUrl$path';
+
+      url = '$url$path';
       print('[H5Webview] Loading local assets: $url');
     }
-    
+
     setState(() {
+      _progress = 0;
       _initialUrl = url;
       _webViewKey = UniqueKey();
     });
@@ -105,16 +111,20 @@ class H5WebviewState extends State<H5Webview> {
   Widget build(BuildContext context) {
     // show a placeholder while computing the initial URL / starting server
     if (_initialUrl == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: SizedBox(
+          width: 80,
+          height: 80,
+          child: CircularProgressIndicator(strokeWidth: 6),
+        ),
+      );
     }
-
+    bool showH5Page = _progress >= 100 || _isLoaded;
     return Stack(
       children: [
         InAppWebView(
           key: _webViewKey,
-          initialUrlRequest: URLRequest(
-            url: WebUri(_initialUrl!),
-          ),
+          initialUrlRequest: URLRequest(url: WebUri(_initialUrl!)),
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
             useOnLoadResource: true,
@@ -130,6 +140,11 @@ class H5WebviewState extends State<H5Webview> {
           initialUserScripts: UnmodifiableListView<UserScript>([
             widget.bridge.userScript,
           ]),
+          onProgressChanged: (controller, progress) {
+            setState(() {
+              _progress = progress;
+            });
+          },
           onWebViewCreated: (controller) async {
             _controller = controller;
             await widget.bridge.attach(controller);
@@ -151,27 +166,32 @@ class H5WebviewState extends State<H5Webview> {
               _redirectCount = 0;
               _lastUrl = url?.toString();
             }
-            
-            setState(() {
-              _isLoaded = false;
-            });
           },
           shouldOverrideUrlLoading: (controller, navigationAction) async {
             final uri = navigationAction.request.url;
             if (uri != null) {
               print('[H5Webview] Navigation to: ${uri.toString()}');
-              
+
               // 防止HTTP到HTTPS的循环重定向
-              if (_lastUrl != null && 
-                  ((_lastUrl!.startsWith('http://') && uri.toString().startsWith('https://')) ||
-                   (_lastUrl!.startsWith('https://') && uri.toString().startsWith('http://')))) {
-                final httpUrl = _lastUrl!.replaceFirst('https://', '').replaceFirst('http://', '');
-                final newUrl = uri.toString().replaceFirst('https://', '').replaceFirst('http://', '');
-                
+              if (_lastUrl != null &&
+                  ((_lastUrl!.startsWith('http://') &&
+                          uri.toString().startsWith('https://')) ||
+                      (_lastUrl!.startsWith('https://') &&
+                          uri.toString().startsWith('http://')))) {
+                final httpUrl = _lastUrl!
+                    .replaceFirst('https://', '')
+                    .replaceFirst('http://', '');
+                final newUrl = uri
+                    .toString()
+                    .replaceFirst('https://', '')
+                    .replaceFirst('http://', '');
+
                 if (httpUrl == newUrl) {
                   _redirectCount++;
                   if (_redirectCount > 3) {
-                    print('[H5Webview] Preventing redirect loop between HTTP/HTTPS');
+                    print(
+                      '[H5Webview] Preventing redirect loop between HTTP/HTTPS',
+                    );
                     return NavigationActionPolicy.CANCEL;
                   }
                 }
@@ -194,14 +214,47 @@ class H5WebviewState extends State<H5Webview> {
               widget.onLoadError!(url?.toString() ?? '', code, message);
             }
           },
-          onConsoleMessage: (controller, consoleMessage) =>
-              print('console: ${consoleMessage.message}'),
+          onConsoleMessage:
+              (controller, consoleMessage) =>
+                  print('console: ${consoleMessage.message}'),
         ),
-        if (!_isLoaded)
-          Container(
-            color: Colors.white,
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(),
+          AnimatedOpacity(
+            opacity: showH5Page ? 0.0 : 1.0,
+            duration: Duration(milliseconds: 300),
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: Colors.white,
+              child: Stack(
+                children: [
+                  Center(
+                    child: SizedBox(
+                      width: 80,
+                      height: 80,
+                      child: CircularProgressIndicator(strokeWidth: 6),
+                    ),
+                  ),
+                  //
+                    // 共享元素过渡 终点 - 显示应用图标
+                    Center(
+                      child: Hero(
+                        tag: widget.heroTag!,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: ClipOval(
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              width: 60,
+                              height: 60,
+                              child: widget.heroIcon,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                ],
+              ),
+            ),
           ),
       ],
     );

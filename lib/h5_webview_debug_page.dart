@@ -1,4 +1,23 @@
-// Reusable widget to load local H5 packaged under assets/h5/<appName>/index.html
+/// Universal debug widget to load local H5 packaged under assets/h5/<appName>/index.html
+/// 
+/// This widget provides a debug interface for testing communication between Flutter and H5 apps.
+/// It displays a split-screen layout with Flutter controls on the left and H5 WebView on the right.
+/// 
+/// Features:
+/// - Real-time message logging between Flutter and H5
+/// - Interactive message sending to H5
+/// - Event monitoring and debugging
+/// - Support for any H5 app under assets/h5/<appName>/
+/// 
+/// Usage:
+/// ```dart
+/// H5WebviewDebugPage(
+///   appName: 'app1', // or 'app2', 'vue-app', etc.
+///   onWebViewCreated: (controller) {
+///     // Handle webview creation
+///   },
+/// )
+/// ```
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -23,33 +42,38 @@ class MessageItem {
   });
 }
 
-class App1H5WebviewDebugPage extends StatefulWidget {
-  /// appName should correspond to the folder name under assets/h5, e.g. "app1" or "app2"
+class H5WebviewDebugPage extends StatefulWidget {
+  /// appName should correspond to the folder name under assets/h5, e.g. "app1", "app2", "vue-app"
   /// The entry point will be assets/h5/<appName>/dist/index.html
   /// This is ignored if onlineUrl is provided
   final String appName;
 
+  /// Optional hero tag for shared element transition
+  final String heroTag;
+
+  /// Optional hero icon for shared element transition
+  final Widget heroIcon;
+
   final WebViewCreatedCallback? onWebViewCreated;
   final void Function(String url)? onLoadStop;
   final void Function(String url, int code, String message)? onLoadError;
-  final void Function(int progress)? onProgress;
 
-  const App1H5WebviewDebugPage({
+  const H5WebviewDebugPage({
     Key? key,
     required this.appName,
+    required this.heroTag,
+    required this.heroIcon,
     this.onWebViewCreated,
     this.onLoadStop,
     this.onLoadError,
-    this.onProgress,
   }) : super(key: key);
 
   @override
-  _App1H5WebviewDebugPageState createState() => _App1H5WebviewDebugPageState();
+  _H5WebviewDebugPageState createState() => _H5WebviewDebugPageState();
 }
 
-class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
+class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
   final AppBridge _bridge = AppBridge();
-  dynamic _lastH5Reply;
   String? _arrowOutMsg; // Flutter -> H5
   String? _arrowInMsg; // H5 -> Flutter
   // Unified message list with timestamps
@@ -245,7 +269,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
       // Create the reply
       final Map<String, Object> reply = {
         'reply': 'Flutter 已收到: $fullMessage',
-        'page': 'app1',
+        'page': widget.appName,
         'ts': DateTime.now().millisecondsSinceEpoch,
       };
 
@@ -304,7 +328,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
   void _setupBridgeEvents() {
     // Add page.ready event handler
     _bridge.onEvent('page.ready', (payload) {
-      debugPrint('App1 - H5 page.ready: $payload');
+      debugPrint('${widget.appName} - H5 page.ready: $payload');
       _appendMessage('page.ready', payload.toString(), 'h5-to-flutter');
     });
 
@@ -314,7 +338,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
           payload is Map && payload['message'] != null
               ? payload['message'].toString()
               : payload.toString();
-      debugPrint('App1 - H5 push message: $message');
+      debugPrint('${widget.appName} - H5 push message: $message');
       _appendMessage('h5.pushMessage', '推送消息: $message', 'h5-to-flutter');
     });
   }
@@ -333,7 +357,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
       final res = await _bridge.invokeJs('page.echo', {'message': message});
       if (mounted) {
         setState(() {
-          _lastH5Reply = res;
           _arrowInMsg = res?.toString();
         });
         _appendMessage('page.echo', res.toString(), 'flutter-to-h5');
@@ -342,7 +365,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _lastH5Reply = {'error': e.toString()};
           _arrowInMsg = 'Error: ${e.toString()}';
         });
         _appendMessage('page.echo', 'Error: ${e.toString()}', 'flutter-to-h5');
@@ -377,7 +399,7 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        "Flutter 基座",
+                        "Flutter 基座 - ${widget.appName}",
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -471,7 +493,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                               final res = await _bridge.invokeJs('h5.getInfo');
                               if (mounted) {
                                 setState(() {
-                                  _lastH5Reply = res;
                                   _arrowInMsg = res?.toString();
                                 });
                                 _appendMessage('h5.getInfo', res.toString(), 'flutter-to-h5');
@@ -479,7 +500,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                             } catch (e) {
                               if (mounted) {
                                 setState(() {
-                                  _lastH5Reply = {'error': e.toString()};
                                   _arrowInMsg = 'Error: ${e.toString()}';
                                 });
                                 _appendMessage(
@@ -644,6 +664,8 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                   child: H5Webview(
                     appName: widget.appName,
                     bridge: _bridge,
+                    heroTag: widget.heroTag,
+                    heroIcon: widget.heroIcon,
                     onWebViewCreated: widget.onWebViewCreated,
                     onLoadStop: (url) {
                       // Handle onLoadStop with additional debug functionality
@@ -668,7 +690,6 @@ class _App1H5WebviewDebugPageState extends State<App1H5WebviewDebugPage> {
                       }
                     },
                     onLoadError: widget.onLoadError,
-                    onProgress: widget.onProgress,
                   ),
                 ),
               ),

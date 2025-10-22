@@ -38,7 +38,7 @@ class LocalhostServerManager {
 
     // ✅ 最后兜底：让操作系统自动分配端口 (port=0)，彻底避免 TOCTOU
     try {
-      final srv = InAppLocalhostServer(documentRoot: _documentRoot, port: 0);
+      final srv = InAppLocalhostServer(documentRoot: _documentRoot!, port: 0);
       await srv.start();
       _server = srv;
       _port = srv.port; // 系统实际分配的端口
@@ -56,7 +56,7 @@ class LocalhostServerManager {
   /// 尝试启动服务
   Future<bool> _tryStartServer(int port) async {
     try {
-      final srv = InAppLocalhostServer(documentRoot: _documentRoot, port: port);
+      final srv = InAppLocalhostServer(documentRoot: _documentRoot!, port: port);
       await srv.start();
       _server = srv;
       _port = port;
