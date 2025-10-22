@@ -595,7 +595,6 @@ assets/h5/your-app/
   "name": "你的应用名称",
   "version": "1.0.0",
   "description": "应用描述",
-  "icon": "icon.png"
 }
 ```
 
@@ -607,7 +606,6 @@ assets/h5/your-app/
 | `name` | String | ✅ | 应用显示名称 |
 | `version` | String | ✅ | 应用版本号 |
 | `description` | String | ✅ | 应用描述信息 |
-| `icon` | String | ✅ | 应用图标文件名（相对路径） |
 
 #### 注册应用
 
@@ -628,9 +626,9 @@ _handleGetLocalApps([
 ```yaml
 flutter:
   assets:
+    - assets/h5/your-app/
     - assets/h5/your-app/dist/
-    - assets/h5/your-app/icon.png
-    - assets/h5/your-app/manifest.json
+    - assets/h5/your-app/dist/assets/
 ```
 
 ### 方式二：缓存应用接入
@@ -647,7 +645,7 @@ flutter:
     └── index.html        # 入口文件（必需）
 ```
 
-manifest.json 格式与本地应用相同，需包含 `appId`、`name`、`version`、`description`、`icon` 五个必填字段。
+manifest.json 格式与本地应用相同，需包含 `appId`、`name`、`version`、`description` 4个必填字段。
 
 **获取路径：**
 

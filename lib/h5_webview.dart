@@ -11,13 +11,18 @@ typedef WebViewCreatedCallback =
 class H5Webview extends StatefulWidget {
   /// appName should correspond to the folder name under assets/h5, e.g. "app1" or "app2"
   /// The entry point will be assets/h5/<appName>/dist/index.html
-  /// This is ignored if onlineUrl is provided
+  /// This is ignored if onlineUrl or localFilePath is provided
   final String appName;
 
   /// Optional online URL to load instead of local assets
   /// If provided, appName is ignored and this URL will be loaded directly
   /// Example: 'https://example.com/app' or 'http://localhost:3000'
   final String? onlineUrl;
+
+  /// Optional file system path to load instead of assets
+  /// If provided, this will be used with file:// protocol
+  /// Example: '/path/to/app/dist/index.html'
+  final String? localFilePath;
 
   /// External bridge instance - if provided, this will be used instead of creating a new one
   /// This allows external control over bridge methods and events
@@ -40,6 +45,7 @@ class H5Webview extends StatefulWidget {
     required this.appName,
     required this.bridge,
     this.onlineUrl,
+    this.localFilePath,
     required this.heroTag,
     required this.heroIcon,
     this.onWebViewCreated,
@@ -70,9 +76,13 @@ class H5WebviewState extends State<H5Webview> {
   Future<void> _startServerAndLoad() async {
     String url;
     if (widget.onlineUrl != null) {
-      // Use online URL directly and ensure HTTPS
+      // Use online URL directly
       url = widget.onlineUrl!;
       print('[H5Webview] Loading online URL: $url');
+    } else if (widget.localFilePath != null) {
+      // Use local file system path with file:// protocol
+      url = 'file://${widget.localFilePath}';
+      print('[H5Webview] Loading local file: $url');
     } else {
       // Use local assets with localhost server
       url = await _serverManager.start(documentRoot: 'assets/h5');
@@ -238,7 +248,7 @@ class H5WebviewState extends State<H5Webview> {
                     // 共享元素过渡 终点 - 显示应用图标
                     Center(
                       child: Hero(
-                        tag: widget.heroTag!,
+                        tag: widget.heroTag,
                         child: Material(
                           color: Colors.transparent,
                           child: ClipOval(

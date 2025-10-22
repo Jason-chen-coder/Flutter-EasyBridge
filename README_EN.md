@@ -563,19 +563,20 @@ function sendToFlutter() {
 }
 ```
 
+
 ## 📲 Application Integration Guide
 
-Easy Bridge supports three integration methods. The system automatically aggregates applications from all sources and displays them in the application center.
+Easy Bridge supports three application integration methods. The system automatically aggregates applications from all sources and displays them in the app center.
 
 ### Integration Methods Overview
 
-| Integration Method | Use Case | Advantages | Disadvantages |
-|-------------------|----------|------------|---------------|
-| **Local Apps** | Built-in apps, example apps | Ships with app, fast loading | Requires new release to update |
+| Integration Method | Use Cases | Advantages | Disadvantages |
+|-------------------|-----------|------------|---------------|
+| **Local Apps** | Built-in apps, example apps | Bundled with release, fast loading | Requires app update to modify |
 | **Cached Apps** | Dynamically downloaded apps | Supports hot updates, flexible deployment | Requires initial download |
-| **Online Apps** | Third-party websites, external services | Real-time updates, no packaging needed | Network dependent, slower loading |
+| **Online Apps** | Third-party websites, external services | Real-time updates, no bundling needed | Network dependent, slower loading |
 
-### Method 1: Local App Integration
+### Method 1: Local Application Integration
 
 #### Directory Structure
 
@@ -595,7 +596,6 @@ assets/h5/your-app/
   "name": "Your App Name",
   "version": "1.0.0",
   "description": "App description",
-  "icon": "icon.png"
 }
 ```
 
@@ -607,9 +607,8 @@ assets/h5/your-app/
 | `name` | String | ✅ | App display name |
 | `version` | String | ✅ | App version number |
 | `description` | String | ✅ | App description |
-| `icon` | String | ✅ | App icon filename (relative path) |
 
-#### Register App
+#### Register Application
 
 Modify the `_handleGetLocalApps` method in `lib/app_center.dart`:
 
@@ -621,21 +620,21 @@ _handleGetLocalApps([
 ])
 ```
 
-#### Configure Assets
+#### Configure Resources
 
 Add to `pubspec.yaml`:
 
 ```yaml
 flutter:
   assets:
+    - assets/h5/your-app/
     - assets/h5/your-app/dist/
-    - assets/h5/your-app/icon.png
-    - assets/h5/your-app/manifest.json
+    - assets/h5/your-app/dist/assets/
 ```
 
-### Method 2: Cached App Integration
+### Method 2: Cached Application Integration
 
-#### App Storage Location
+#### Application Storage Location
 
 The system automatically scans the `{ApplicationSupportDirectory}/h5/` directory:
 
@@ -647,7 +646,7 @@ The system automatically scans the `{ApplicationSupportDirectory}/h5/` directory
     └── index.html        # Entry file (required)
 ```
 
-The manifest.json format is identical to local apps and must include the five required fields: `appId`, `name`, `version`, `description`, and `icon`.
+The manifest.json format is the same as local apps, requiring 4 mandatory fields: `appId`, `name`, `version`, `description`.
 
 **Get Path:**
 
@@ -658,11 +657,11 @@ final appSupportDir = await getApplicationSupportDirectory();
 // macOS: ~/Library/Application Support/com.example.easyBridge/
 ```
 
-#### Download App Example
+#### Download Application Example
 
-Simply copy the app files to the corresponding directory, and the system will automatically load them.
+Simply copy the application files to the corresponding directory, and the system will load them automatically.
 
-### Method 3: Online App Integration
+### Method 3: Online Application Integration
 
 #### Configuration Format
 
@@ -692,7 +691,7 @@ Online app configuration is stored in `SharedPreferences` with the key `online_a
 | `iconUrl` | String | ✅ | App icon URL |
 | `url` | String | ✅ | App access URL |
 
-#### Add Online App
+#### Add Online Application
 
 ```dart
 import 'package:shared_preferences/shared_preferences.dart';
@@ -704,8 +703,8 @@ List<dynamic> apps = jsonString != null ? json.decode(jsonString) : [];
 
 apps.add({
   'id': 'my-website',           // Required: unique identifier
-  'name': 'My Website',          // Required: app name
-  'version': '1.0.0',            // Required: version number
+  'name': 'My Website',         // Required: app name
+  'version': '1.0.0',           // Required: version number
   'description': 'Website description',  // Required: app description
   'iconUrl': 'https://mywebsite.com/icon.png',  // Required: icon URL
   'url': 'https://mywebsite.com',  // Required: access URL
@@ -714,10 +713,9 @@ apps.add({
 await prefs.setString('online_apps_config', json.encode(apps));
 ```
 
-### App Loading Priority
+### Application Loading Priority
 
-The system loads all three types of apps in parallel. Display order: **Cached Apps** → **Local Apps** → **Online Apps**
-
+The system loads all three types of applications in parallel, with display order: **Cached Apps** → **Local Apps** → **Online Apps**
 ## 🔧 Platform Configuration
 
 ### macOS Configuration

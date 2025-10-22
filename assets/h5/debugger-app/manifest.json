@@ -2,7 +2,5 @@
     "appId": "7f4b5c2e-1c4a-4a83-9f68-b3a1f8d87c6e",
     "name": "Debugger App",
     "version": "1.0.0",
-    "description": "这是一个本地示例调试应用，展示了基本功能并支持调试。",
-    "icon": "icon.png",
-    "visible": true
+    "description": "这是一个本地示例调试应用，展示了基本功能并支持调试。"
   }

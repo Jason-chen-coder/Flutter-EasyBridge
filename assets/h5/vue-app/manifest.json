@@ -2,7 +2,5 @@
     "appId": "8b8a8e72-9d36-4a9b-b3e9-efc6efc508e2",
     "name": "Vue App",
     "version": "1.0.0",
-    "description": "Vue3 开发的应用",
-    "icon": "icon.png",
-    "visible": true
+    "description": "Vue3 开发的应用"
   }
