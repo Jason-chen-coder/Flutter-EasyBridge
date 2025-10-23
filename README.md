@@ -82,7 +82,7 @@ class MyApp extends StatelessWidget {
         appBar: AppBar(title: Text('本地 H5 应用')),
         body: H5Webview(
           appName: 'app1',  // 对应 assets/h5/app1/dist/index.html
-          bridge: AppBridge(),
+          bridge: AppBridge.instance,
           onLoadStop: (url) {
             print('页面加载完成: $url');
           },
@@ -99,7 +99,7 @@ class MyApp extends StatelessWidget {
 H5Webview(
   appName: 'online_demo',     // 用作标识符
   onlineUrl: 'https://flutter.dev',  // 在线 URL
-  bridge: AppBridge(),
+  bridge: AppBridge.instance,
   onLoadStop: (url) {
     print('在线页面加载完成: $url');
   },
@@ -203,13 +203,13 @@ assets/h5/myapp/
 
 ```dart
 // 基本调用
-final result = await _bridge.invokeJs('h5.methodName', parameters);
+final result = await AppBridge.instance.invokeJs('h5.methodName', parameters);
 
 // 示例：获取 H5 应用信息
-final info = await _bridge.invokeJs('h5.getInfo');
+final info = await AppBridge.instance.invokeJs('h5.getInfo');
 
 // 示例：发送消息到 H5
-final reply = await _bridge.invokeJs('page.echo', {'message': 'Hello H5'});
+final reply = await AppBridge.instance.invokeJs('page.echo', {'message': 'Hello H5'});
 ```
 
 **H5 端注册方法：**
@@ -259,7 +259,7 @@ const reply = await window.AppBridge.invoke('page.h5ToFlutter', {
 
 ```dart
 // 注册方法供 H5 调用
-_bridge.register('app.getInfo', (params) async {
+AppBridge.instance.register('app.getInfo', (params) async {
   final info = await PackageInfo.fromPlatform();
   return {
     'appName': info.appName,
@@ -271,7 +271,7 @@ _bridge.register('app.getInfo', (params) async {
   };
 });
 
-_bridge.register('page.h5ToFlutter', (params) async {
+AppBridge.instance.register('page.h5ToFlutter', (params) async {
   String message;
   String? from;
   if (params is Map) {
@@ -298,7 +298,7 @@ _bridge.register('page.h5ToFlutter', (params) async {
 
 ```dart
 // 发送事件到 H5（无需等待返回）
-await _bridge.emitEventToJs('flutter.pushMessage', {
+await AppBridge.instance.emitEventToJs('flutter.pushMessage', {
   'message': 'Flutter 推送消息',
   'from': 'flutter',
   'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -339,11 +339,11 @@ window.AppBridge.emit('h5.pushMessage', {
 
 ```dart
 // 监听 H5 发送的事件
-_bridge.onEvent('page.ready', (payload) {
+AppBridge.instance.onEvent('page.ready', (payload) {
   print('H5 页面准备完成: $payload');
 });
 
-_bridge.onEvent('h5.pushMessage', (payload) {
+AppBridge.instance.onEvent('h5.pushMessage', (payload) {
   final message = payload is Map && payload['message'] != null
       ? payload['message'].toString()
       : payload.toString();
@@ -416,7 +416,7 @@ shouldOverrideUrlLoading: (controller, navigationAction) async {
 
 ```dart
 try {
-  final result = await _bridge.invokeJs('some.method');
+  final result = await AppBridge.instance.invokeJs('some.method');
 } on TimeoutException {
   print('调用超时');
 } catch (e) {
@@ -448,7 +448,7 @@ AppItem(
     body: H5Webview(
       key: UniqueKey(),
       appName: 'newapp',
-      bridge: AppBridge(),
+      bridge: AppBridge.instance,
       // 可选：添加在线 URL
       // onlineUrl: 'https://example.com',
     ),
@@ -471,7 +471,7 @@ class MyAppDebugPage extends StatefulWidget {
 }
 
 class _MyAppDebugPageState extends State<MyAppDebugPage> {
-  final AppBridge _bridge = AppBridge();
+  final AppBridge _bridge = AppBridge.instance;
   final List<MessageItem> _messageLog = [];
   
   @override
@@ -630,6 +630,8 @@ flutter:
     - assets/h5/your-app/dist/
     - assets/h5/your-app/dist/assets/
 ```
+#### web项目打包注意事项：
+base路径设置为相对路径(defineConfig({base: './', }))
 
 ### 方式二：缓存应用接入
 
@@ -823,3 +825,5 @@ A: 确保使用 `App1H5WebviewDebugPage` 或类似的调试页面，普通的 `H
 1. 更多在线 URL 兼容性优化
 2. 性能监控和分析工具
 3. H5 应用热重载支持
+
+

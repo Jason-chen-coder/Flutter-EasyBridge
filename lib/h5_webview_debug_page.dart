@@ -1,14 +1,14 @@
 /// Universal debug widget to load local H5 packaged under assets/h5/<appName>/index.html
-/// 
+///
 /// This widget provides a debug interface for testing communication between Flutter and H5 apps.
 /// It displays a split-screen layout with Flutter controls on the left and H5 WebView on the right.
-/// 
+///
 /// Features:
 /// - Real-time message logging between Flutter and H5
 /// - Interactive message sending to H5
 /// - Event monitoring and debugging
 /// - Support for any H5 app under assets/h5/<appName>/
-/// 
+///
 /// Usage:
 /// ```dart
 /// H5WebviewDebugPage(
@@ -73,7 +73,7 @@ class H5WebviewDebugPage extends StatefulWidget {
 }
 
 class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
-  final AppBridge _bridge = AppBridge();
+  final AppBridge _bridge = AppBridge.instance;
   String? _arrowOutMsg; // Flutter -> H5
   String? _arrowInMsg; // H5 -> Flutter
   // Unified message list with timestamps
@@ -421,7 +421,10 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red[400],
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               minimumSize: const Size(60, 32),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
@@ -432,7 +435,10 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
                                 _unifiedMessageLogs.clear();
                               });
                             },
-                            child: const Text('清空', style: TextStyle(fontSize: 12)),
+                            child: const Text(
+                              '清空',
+                              style: TextStyle(fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
@@ -459,14 +465,15 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
                                     padding: const EdgeInsets.all(8),
                                     itemCount: _unifiedMessageLogs.length,
                                     itemBuilder: (context, index) {
-                                      final messageItem = _unifiedMessageLogs[index];
+                                      final messageItem =
+                                          _unifiedMessageLogs[index];
                                       return _buildMessageItem(
                                         messageItem,
-                                        messageItem.direction == 'h5-to-flutter' 
-                                            ? '[H5 → Flutter]' 
+                                        messageItem.direction == 'h5-to-flutter'
+                                            ? '[H5 → Flutter]'
                                             : '[Flutter → H5]',
-                                        messageItem.direction == 'h5-to-flutter' 
-                                            ? Colors.orange 
+                                        messageItem.direction == 'h5-to-flutter'
+                                            ? Colors.orange
                                             : Colors.blue,
                                       );
                                     },
@@ -495,7 +502,11 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
                                 setState(() {
                                   _arrowInMsg = res?.toString();
                                 });
-                                _appendMessage('h5.getInfo', res.toString(), 'flutter-to-h5');
+                                _appendMessage(
+                                  'h5.getInfo',
+                                  res.toString(),
+                                  'flutter-to-h5',
+                                );
                               }
                             } catch (e) {
                               if (mounted) {
@@ -645,53 +656,150 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
             ),
             // Right: H5 WebView
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.black12),
+              child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: H5Webview(
-                    appName: widget.appName,
-                    bridge: _bridge,
-                    heroTag: widget.heroTag,
-                    heroIcon: widget.heroIcon,
-                    onWebViewCreated: widget.onWebViewCreated,
-                    onLoadStop: (url) {
-                      // Handle onLoadStop with additional debug functionality
-                      // Try calling a JS method to fetch state
-                      _bridge
-                          .invokeJs('page.getState')
-                          .then((state) {
-                            debugPrint('JS page.getState -> $state');
-                            _appendMessage('page.getState', state.toString(), 'flutter-to-h5');
-                          })
-                          .catchError((e) {
-                            debugPrint('JS page.getState error -> $e');
-                            _appendMessage(
-                              'page.getState',
-                              'Error: ${e.toString()}',
-                              'flutter-to-h5',
-                            );
-                          });
+                  child: Stack(
+                    children: [
+                      // 背景：手机壳
+                      Positioned.fill(
+                        child: Image.asset(
+                          'assets/images/phone.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      // 屏幕区域放 Widget，根据手机壳比例 0.4586:1 动态计算位置
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            // 手机壳图片宽高比
+                            const phoneAspectRatio = 0.4586;
+                            final maxWidth = constraints.maxWidth;
+                            final maxHeight = constraints.maxHeight;
+                            
+                            // 根据约束计算实际手机壳尺寸
+                            double phoneWidth, phoneHeight;
+                            if (maxWidth / maxHeight > phoneAspectRatio) {
+                              // 高度是限制因素
+                              phoneHeight = maxHeight;
+                              phoneWidth = phoneHeight * phoneAspectRatio;
+                            } else {
+                              // 宽度是限制因素
+                              phoneWidth = maxWidth;
+                              phoneHeight = phoneWidth / phoneAspectRatio;
+                            }
+                            
+                            // 计算居中的手机壳偏移
+                            final phoneOffsetLeft = (maxWidth - phoneWidth) / 2;
+                            final phoneOffsetTop = (maxHeight - phoneHeight) / 2;
+                            
+                            // 计算屏幕相对于手机壳的内边距（百分比）
+                            // 这些值可以根据实际的手机壳设计调整
+                            final screenPaddingHRatio = 0.04; // 左右各12.8%
+                            final screenPaddingVRatio = 0.020; // 上下各2.5%
+                            
+                            final screenPaddingH = phoneWidth * screenPaddingHRatio;
+                            final screenPaddingV = phoneHeight * screenPaddingVRatio;
+                            
+                            return Stack(
+                              children: [
+                                Positioned(
+                                  left: phoneOffsetLeft + screenPaddingH,
+                                  right: phoneOffsetLeft + screenPaddingH,
+                                  top: phoneOffsetTop + screenPaddingV,
+                                  bottom: phoneOffsetTop + screenPaddingV,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      color: Colors.red, // 模拟屏幕背景
+                                      child: Center(
+                                        child: H5Webview(
+                                          appName: widget.appName,
+                                          bridge: _bridge,
+                                          heroTag: widget.heroTag,
+                                          heroIcon: widget.heroIcon,
+                                          onWebViewCreated: widget.onWebViewCreated,
+                                          onLoadStop: (url) {
+                                            // Handle onLoadStop with additional debug functionality
+                                            // Try calling a JS method to fetch state
+                                            _bridge
+                                                .invokeJs('page.getState')
+                                                .then((state) {
+                                              debugPrint('JS page.getState -> $state');
+                                              _appendMessage(
+                                                'page.getState',
+                                                state.toString(),
+                                                'flutter-to-h5',
+                                              );
+                                            })
+                                                .catchError((e) {
+                                              debugPrint('JS page.getState error -> $e');
+                                              _appendMessage(
+                                                'page.getState',
+                                                'Error: ${e.toString()}',
+                                                'flutter-to-h5',
+                                              );
+                                            });
 
-                      if (widget.onLoadStop != null) {
-                        widget.onLoadStop!(url);
-                      }
-                    },
-                    onLoadError: widget.onLoadError,
-                  ),
-                ),
+                                            if (widget.onLoadStop != null) {
+                                              widget.onLoadStop!(url);
+                                            }
+                                          },
+                                          onLoadError: widget.onLoadError,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                // Positioned(
+                //   child: Container(
+                //     color: Colors.transparent,
+                //     padding: EdgeInsets.symmetric(
+                //       horizontal: 60,
+                //       vertical: 60,
+                //     ),
+                //     child: H5Webview(
+                //       appName: widget.appName,
+                //       bridge: _bridge,
+                //       heroTag: widget.heroTag,
+                //       heroIcon: widget.heroIcon,
+                //       onWebViewCreated: widget.onWebViewCreated,
+                //       onLoadStop: (url) {
+                //         // Handle onLoadStop with additional debug functionality
+                //         // Try calling a JS method to fetch state
+                //         _bridge
+                //             .invokeJs('page.getState')
+                //             .then((state) {
+                //               debugPrint('JS page.getState -> $state');
+                //               _appendMessage(
+                //                 'page.getState',
+                //                 state.toString(),
+                //                 'flutter-to-h5',
+                //               );
+                //             })
+                //             .catchError((e) {
+                //               debugPrint('JS page.getState error -> $e');
+                //               _appendMessage(
+                //                 'page.getState',
+                //                 'Error: ${e.toString()}',
+                //                 'flutter-to-h5',
+                //               );
+                //             });
+                //
+                //         if (widget.onLoadStop != null) {
+                //           widget.onLoadStop!(url);
+                //         }
+                //       },
+                //       onLoadError: widget.onLoadError,
+                //     ),
+                //   ),
+                // ),
               ),
             ),
           ],

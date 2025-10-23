@@ -129,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (window.AppBridge && typeof window.AppBridge.getCapabilities === 'function') {
     window.AppBridge.getCapabilities().then(function (cap) {
       console.log('Capabilities:', JSON.stringify(cap));
+      appendItem('Capabilities: ' + JSON.stringify(cap), 'h5-to-flutter', 'app.getCapabilities');
     }).catch(function (e) { console.warn('Capabilities error:', e); });
   }
 

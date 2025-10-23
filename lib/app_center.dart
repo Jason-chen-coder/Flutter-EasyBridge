@@ -49,6 +49,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
       _handleGetLocalApps([
         'debugger-app',
         'vue-app',
+        'react-app'
       ]).catchError((e) {
         print('[AppCenter] Failed to load local apps: $e');
         return <AppItem>[];
@@ -107,7 +108,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
                     body: H5Webview(
                       key: UniqueKey(),
                       appName: appName,
-                      bridge: AppBridge(),
+                      bridge: AppBridge.instance,
                       heroTag: heroTag,
                       heroIcon: Image.asset(iconPath,fit:BoxFit.cover),
                     ),
@@ -183,7 +184,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
                     body: H5Webview(
                       key: UniqueKey(),
                       appName: appName,
-                      bridge: AppBridge(),
+                      bridge: AppBridge.instance,
                       localFilePath: entryFile.path,  // 使用本地文件路径
                       heroTag: heroTag,
                       heroIcon: Image.file(iconFile,fit:BoxFit.cover,),
@@ -293,7 +294,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
                 body: H5Webview(
                   key: UniqueKey(),
                   appName: id,
-                  bridge: AppBridge(),
+                  bridge: AppBridge.instance,
                   onlineUrl: url,
                   heroTag: heroTag,
                   heroIcon: Image.network(iconUrl,fit:BoxFit.cover),

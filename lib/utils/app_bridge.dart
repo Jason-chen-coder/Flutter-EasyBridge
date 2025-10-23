@@ -1,29 +1,94 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// AppBridge: A simple, versioned bidirectional bridge between Flutter and H5.
 ///
-/// Features:
+/// # Features:
+/// - Singleton pattern for easy global access
 /// - Injects a small JS SDK that exposes `window.AppBridge` for third-party H5.
 /// - Request/Response (both directions) with timeout and errors.
 /// - Event emitting and listening (both directions).
 /// - Method routing on Flutter side with white-listed handlers.
+/// - Built-in methods for H5 to call (e.g., easyBridge.getInfo)
 ///
-/// Usage (Flutter):
-///   final bridge = AppBridge();
-///   // add bridge.userScript to initialUserScripts
-///   await bridge.attach(controller);
-///   bridge.register('user.getProfile', (params) async => {...});
-///   bridge.onEvent('app.visibility', (p) { ... });
-///   final jsResult = await bridge.invokeJs('page.getState');
+/// # Singleton Usage (Flutter):
+/// ```dart
+/// // Access the singleton instance anywhere
+/// final bridge = AppBridge.instance;
+/// 
+/// // Initialize in your webview widget
+/// await bridge.attach(controller);
+/// 
+/// // Default handlers (easyBridge.getInfo) are automatically registered
+/// 
+/// // Register custom methods
+/// bridge.register('user.getProfile', (params) async => {...});
+/// 
+/// // Listen to events from H5
+/// bridge.onEvent('app.visibility', (p) { ... });
+/// 
+/// // Invoke methods registered in H5
+/// final jsResult = await bridge.invokeJs('page.getState');
+/// 
+/// // Emit events to H5
+/// await bridge.emitEventToJs('app.ready', {'status': 'initialized'});
+/// ```
 ///
-/// Usage (JS in H5):
-///   const profile = await AppBridge.invoke('user.getProfile');
-///   AppBridge.on('app.visibility', payload => console.log(payload));
-///   AppBridge.register('page.getState', async () => ({ ready: true }));
+/// # JavaScript Usage (H5):
+/// ```javascript
+/// // Get app info (built-in method)
+/// const info = await AppBridge.invoke('easyBridge.getInfo');
+/// console.log(info); 
+/// // Result: {
+/// //   success: true,
+/// //   data: {
+/// //     appName: "easy_bridge",
+/// //     packageName: "com.example.easy_bridge",
+/// //     version: "1.0.0",
+/// //     buildNumber: "1",
+/// //     platform: "android" | "ios" | "macos" | "windows" | "linux"
+/// //   }
+/// // }
+///
+/// // Register a method for Flutter to call
+/// AppBridge.register('page.getState', async () => ({ ready: true }));
+///
+/// // Listen to events from Flutter
+/// AppBridge.on('app.visibility', payload => console.log(payload));
+///
+/// // Emit events to Flutter
+/// AppBridge.emit('app.ready', { timestamp: Date.now() });
+///
+/// // Get available methods
+/// const capabilities = await AppBridge.invoke('easyBridge.getCapabilities');
+/// console.log(capabilities.methods); // List of all available methods
+/// ```
+///
+/// # Default Methods Available to H5:
+/// - `easyBridge.getInfo` - Get current app information (version, platform, etc.)
+/// - `easyBridge.getCapabilities` - Get bridge version and available features
+///
+/// # Adding Custom Methods:
+/// ```dart
+/// bridge.register('custom.method', (params) async {
+///   return {
+///     'success': true,
+///     'data': params,
+///   };
+/// });
+/// ```
 class AppBridge {
-  AppBridge({this.version = '1.0'});
+  AppBridge._({this.version = '1.0'}) {
+    // Initialize default handlers immediately when singleton is created
+    _initDefaultHandlers();
+  }
+
+  static final AppBridge _instance = AppBridge._(version: '1.0');
+
+  static AppBridge get instance => _instance;
 
   final String version;
   InAppWebViewController? _controller;
@@ -45,7 +110,7 @@ class AppBridge {
     _controller = controller;
 
     // Built-in capability API
-    register('bridge.getCapabilities', (params) async => {
+    register('easyBridge.getCapabilities', (params) async => {
           'version': version,
           'methods': _routes.keys.toList(),
           'features': {
@@ -63,6 +128,43 @@ class AppBridge {
         return null;
       },
     );
+  }
+
+  /// Initialize default handlers that can be called from H5
+  Future<void> _initDefaultHandlers() async {
+    register('easyBridge.getInfo', (params) async => await _getAppInfo());
+  }
+
+  /// Get application information
+  Future<Map<String, dynamic>> _getAppInfo() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return {
+        'success': true,
+        'data': {
+          'appName': packageInfo.appName,
+          'packageName': packageInfo.packageName,
+          'version': packageInfo.version,
+          'buildNumber': packageInfo.buildNumber,
+          'platform': Platform.isAndroid
+              ? 'android'
+              : Platform.isIOS
+                  ? 'ios'
+                  : Platform.isWindows
+                      ? 'windows'
+                      : Platform.isLinux
+                          ? 'linux'
+                          : Platform.isMacOS
+                              ? 'macos'
+                              : 'unknown',
+        }
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
   }
 
   void detach() {
@@ -332,7 +434,7 @@ const String _jsSdkSource = r"""
     emit(event, params) { return sendMessage({ v: '1.0', type: 'event', method: event, params }); },
     register(method, handler) { serverHandlers.set(method, handler); },
     unregister(method) { serverHandlers.delete(method); },
-    async getCapabilities() { return this.invoke('bridge.getCapabilities'); }
+    async getCapabilities() { return this.invoke('easyBridge.getCapabilities'); }
   };
 
   window.AppBridge = AppBridge;

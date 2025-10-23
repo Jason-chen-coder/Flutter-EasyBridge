@@ -82,7 +82,7 @@ class MyApp extends StatelessWidget {
         appBar: AppBar(title: Text('Local H5 App')),
         body: H5Webview(
           appName: 'app1',  // Corresponds to assets/h5/app1/dist/index.html
-          bridge: AppBridge(),
+          bridge: AppBridge.instance,
           onLoadStop: (url) {
             print('Page loaded: $url');
           },
@@ -93,13 +93,13 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-#### Online URL Loading
+#### Loading from Online URL
 
 ```dart
 H5Webview(
   appName: 'online_demo',     // Used as identifier
   onlineUrl: 'https://flutter.dev',  // Online URL
-  bridge: AppBridge(),
+  bridge: AppBridge.instance,
   onLoadStop: (url) {
     print('Online page loaded: $url');
   },
@@ -448,7 +448,7 @@ AppItem(
     body: H5Webview(
       key: UniqueKey(),
       appName: 'newapp',
-      bridge: AppBridge(),
+      bridge: AppBridge.instance,
       // Optional: add online URL
       // onlineUrl: 'https://example.com',
     ),
@@ -471,7 +471,7 @@ class MyAppDebugPage extends StatefulWidget {
 }
 
 class _MyAppDebugPageState extends State<MyAppDebugPage> {
-  final AppBridge _bridge = AppBridge();
+  final AppBridge _bridge = AppBridge.instance;
   final List<MessageItem> _messageLog = [];
   
   @override
@@ -631,6 +631,11 @@ flutter:
     - assets/h5/your-app/dist/
     - assets/h5/your-app/dist/assets/
 ```
+```
+#### Notes for Web Project Packaging:
+
+Set the base path to a relative path (defineConfig({ base: './', }))
+
 
 ### Method 2: Cached Application Integration
 
