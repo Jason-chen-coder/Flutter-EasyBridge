@@ -10,6 +10,13 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart';
 
+/// 应用类型枚举
+enum AppType {
+  online,  // 在线应用
+  cache,   // 缓存应用（离线安装的）
+  local,   // 本地应用（内置）
+}
+
 class AppItem {
   final String name;
   final String description;
@@ -17,12 +24,14 @@ class AppItem {
   final Widget icon;
   final WidgetBuilder builder;
   final String heroTag;
+  final AppType type;
 
   const AppItem({
     required this.name,
     required this.icon,
     required this.builder,
     required this.heroTag,
+    required this.type,
     this.description = '',
     this.version = '1.0.0',
   });
@@ -95,6 +104,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
               version: version,
               icon: Image.asset(iconPath),
               heroTag: heroTag,
+              type: AppType.local,
               builder: (context) => appName == 'debugger-app'
                 ? H5WebviewDebugPage(
                     key: UniqueKey(),
@@ -178,6 +188,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
                   version: version,
                   icon: Image.file(iconFile,fit:BoxFit.cover,),
                   heroTag: heroTag,
+                  type: AppType.cache,
                   builder: (context) => Scaffold(
                     backgroundColor: Colors.white,
                     appBar: AppBar(backgroundColor: Colors.white),
@@ -288,6 +299,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
               version: version,
               icon: Image.network(iconUrl,fit:BoxFit.cover),
               heroTag: heroTag,
+              type: AppType.online,
               builder: (context) => Scaffold(
                 backgroundColor: Colors.white,
                 appBar: AppBar(backgroundColor: Colors.white),
@@ -807,6 +819,159 @@ class _AppCenterPageState extends State<AppCenterPage> {
     });
   }
 
+  /// 删除应用
+  Future<void> _deleteApp(AppItem app) async {
+    // 先显示确认对话框
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除应用'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('确定要删除应用 "${app.name}" 吗？'),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ 删除将不可撤回',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    // 根据应用类型执行删除操作
+    try {
+      if (app.type == AppType.online) {
+        await _deleteOnlineApp(app);
+      } else if (app.type == AppType.cache) {
+        await _deleteCacheApp(app);
+      }
+    } catch (e) {
+      print('[AppCenter] Error deleting app: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 删除在线应用
+  Future<void> _deleteOnlineApp(AppItem app) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const String key = 'online_apps_config';
+
+      // 读取现有配置
+      String? jsonString = prefs.getString(key);
+      if (jsonString == null || jsonString.isEmpty) {
+        throw Exception('未找到在线应用配置');
+      }
+
+      // 解析配置
+      List<dynamic> appsConfig = json.decode(jsonString);
+
+      // 从 heroTag 提取 id
+      // heroTag 格式: online-$id-hero
+      // 例如: online-flutter-official-hero -> flutter-official
+      //      online-online-1761127936039-hero -> online-1761127936039
+      String id = app.heroTag;
+      if (id.startsWith('online-')) {
+        id = id.substring(7); // 移除 'online-' 前缀
+      }
+      if (id.endsWith('-hero')) {
+        id = id.substring(0, id.length - 5); // 移除 '-hero' 后缀
+      }
+
+      print('[AppCenter] Deleting online app: ${app.name}, heroTag: ${app.heroTag}, extracted id: $id');
+
+      // 查找并移除对应的应用
+      int removedCount = 0;
+      appsConfig.removeWhere((config) {
+        bool shouldRemove = config['id'] == id;
+        if (shouldRemove) {
+          removedCount++;
+          print('[AppCenter] Found and removing app with id: $id');
+        }
+        return shouldRemove;
+      });
+
+      if (removedCount == 0) {
+        print('[AppCenter] Warning: No app found with id: $id');
+        print('[AppCenter] Available app ids: ${appsConfig.map((c) => c['id']).toList()}');
+      }
+
+      // 保存更新后的配置
+      await prefs.setString(key, json.encode(appsConfig));
+
+      print('[AppCenter] Online app deleted: ${app.name}');
+
+      // 刷新应用列表
+      _refreshAppList();
+
+      // 显示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('应用 "${app.name}" 已删除')),
+        );
+      }
+    } catch (e) {
+      print('[AppCenter] Error deleting online app: $e');
+      rethrow;
+    }
+  }
+
+  /// 删除缓存应用（移除目录）
+  Future<void> _deleteCacheApp(AppItem app) async {
+    try {
+      // 从 heroTag 提取应用名称
+      // heroTag 格式: cache-$appName-hero
+      String appName = app.heroTag
+          .replaceAll('cache-', '')
+          .replaceAll('-hero', '');
+
+      final Directory appSupportDir = await getApplicationSupportDirectory();
+      final Directory appDir = Directory('${appSupportDir.path}/h5/$appName');
+
+      if (await appDir.exists()) {
+        await appDir.delete(recursive: true);
+        print('[AppCenter] Cache app directory deleted: ${appDir.path}');
+      }
+
+      // 刷新应用列表
+      _refreshAppList();
+
+      // 显示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('应用 "${app.name}" 已删除')),
+        );
+      }
+    } catch (e) {
+      print('[AppCenter] Error deleting cache app: $e');
+      rethrow;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -863,6 +1028,8 @@ class _AppCenterPageState extends State<AppCenterPage> {
                       context,
                     ).push(MaterialPageRoute(builder: (_) => app.builder(context)));
                   },
+                  type: app.type,
+                  onDelete: () => _deleteApp(app),
                 );
               },
             ),
@@ -880,6 +1047,8 @@ class _AppTile extends StatelessWidget {
   final Widget icon;
   final VoidCallback onTap;
   final String heroTag;
+  final AppType type;
+  final VoidCallback onDelete;
 
   const _AppTile({
     required this.name,
@@ -888,6 +1057,8 @@ class _AppTile extends StatelessWidget {
     required this.icon,
     required this.onTap,
     required this.heroTag,
+    required this.type,
+    required this.onDelete,
   });
 
   @override
@@ -944,23 +1115,54 @@ class _AppTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      SizedBox(
-                        height: 26,
-                        child: ElevatedButton(
-                          onPressed: onTap,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            backgroundColor: Color(0xff31DA9F),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 8,
+                        children: [
+                          SizedBox(
+                            height: 26,
+                            child: ElevatedButton(
+                              onPressed: onTap,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                backgroundColor: Color(0xff31DA9F),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              child: const Text(
+                                '打开',
+                                style: TextStyle(fontSize: 14),
+                              ),
                             ),
                           ),
-                          child: const Text(
-                            '打开',
-                            style: TextStyle(fontSize: 14),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 26,
+                            child: ElevatedButton(
+                              onPressed: type == AppType.local ? null : onDelete,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                backgroundColor: type == AppType.local 
+                                    ? Colors.grey[300]
+                                    : Colors.red,
+                                foregroundColor: type == AppType.local 
+                                    ? Colors.grey[600]
+                                    : Colors.white,
+                                disabledBackgroundColor: Colors.grey[300],
+                                disabledForegroundColor: Colors.grey[600],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              child: const Text(
+                                '删除',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

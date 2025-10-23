@@ -37,6 +37,11 @@
   <p><em>应用主界面展示 - Flutter 基座与 H5 应用的双向通信调试界面</em></p>
 </div>
 
+<div align="center">
+  <img src="images/app.gif" alt="Easy Bridge 应用演示" width="800" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <p><em>应用演示 - Flutter 与 H5 双向通信实时交互</em></p>
+</div>
+
 ## 🏗️ 项目结构
 
 ```
