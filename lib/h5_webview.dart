@@ -85,7 +85,7 @@ class H5WebviewState extends State<H5Webview> {
       print('[H5Webview] Loading local file: $url');
     } else {
       // Use local assets with localhost server
-      url = await _serverManager.start(documentRoot: 'assets/h5');
+      url = await _serverManager.start(assetsDocumentRoot: 'assets/h5');
 
       // Try to find index.html in the dist subdirectory first, then fallback to app directory
       String path = '/${widget.appName}/dist/index.html';
