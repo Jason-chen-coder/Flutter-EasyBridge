@@ -271,6 +271,49 @@ class AppBridge {
           }
           return;
         }
+
+        // Handle JS -> Flutter requests sent via AppBridge.invoke
+        if (type == 'request') {
+          final id = msg['id']?.toString();
+          final method = msg['method']?.toString();
+          dynamic params = msg['params'];
+
+          if (id == null || method == null) {
+            debugPrint('[AppBridge] bridge:message missing id/method: $msg');
+            return;
+          }
+
+          // Align parameter behavior with asHandler: auto-unpack single-element arrays
+          if (params is List && params.length == 1) {
+            params = params.first;
+          }
+
+          Future(() async {
+            try {
+              // Try direct match first, then fall back to as.<method> to reuse existing registrations
+              final handler = _routes[method] ?? _routes['as.$method'];
+              if (handler == null) {
+                throw Exception('未知方法: $method');
+              }
+
+              final result = await handler(params);
+              await _sendToJs({
+                'v': version,
+                'type': 'response',
+                'id': id,
+                'result': result,
+              });
+            } catch (e) {
+              await _sendToJs({
+                'v': version,
+                'type': 'response',
+                'id': id,
+                'error': {'code': -32000, 'message': e.toString()},
+              });
+            }
+          });
+          return;
+        }
       },
     );
   }

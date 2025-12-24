@@ -12,7 +12,7 @@
 /// Usage:
 /// ```dart
 /// H5WebviewDebugPage(
-///   appName: 'app1', // or 'app2', 'rich-lab', etc.
+///   appName: 'app1', // or 'app2', 'rich-editor', etc.
 ///   onWebViewCreated: (controller) {
 ///     // Handle webview creation
 ///   },
@@ -43,7 +43,7 @@ class MessageItem {
 }
 
 class H5WebviewDebugPage extends StatefulWidget {
-  /// appName should correspond to the folder name under assets/h5, e.g. "app1", "app2", "rich-lab"
+  /// appName should correspond to the folder name under assets/h5, e.g. "app1", "app2", "rich-editor"
   /// The entry point will be assets/h5/<appName>/dist/index.html
   /// This is ignored if onlineUrl is provided
   final String appName;
@@ -711,48 +711,45 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
                                 bottom: phoneOffsetTop + screenPaddingV,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(20),
-                                  child: Container(
-                                    color: Colors.red, // 模拟屏幕背景
-                                    child: Center(
-                                      child: H5Webview(
-                                        appName: widget.appName,
-                                        bridge: _bridge,
-                                        heroTag: widget.heroTag,
-                                        heroIcon: widget.heroIcon,
-                                        onWebViewCreated:
-                                            widget.onWebViewCreated,
-                                        onLoadStop: (url) {
-                                          // Handle onLoadStop with additional debug functionality
-                                          // Try calling a JS method to fetch state
-                                          _bridge
-                                              .invokeJs('page.getState')
-                                              .then((state) {
-                                                debugPrint(
-                                                  'JS page.getState -> $state',
-                                                );
-                                                _appendMessage(
-                                                  'page.getState',
-                                                  state.toString(),
-                                                  'flutter-to-h5',
-                                                );
-                                              })
-                                              .catchError((e) {
-                                                debugPrint(
-                                                  'JS page.getState error -> $e',
-                                                );
-                                                _appendMessage(
-                                                  'page.getState',
-                                                  'Error: ${e.toString()}',
-                                                  'flutter-to-h5',
-                                                );
-                                              });
+                                  child: Center(
+                                    child: H5Webview(
+                                      appName: widget.appName,
+                                      bridge: _bridge,
+                                      heroTag: widget.heroTag,
+                                      heroIcon: widget.heroIcon,
+                                      onWebViewCreated:
+                                          widget.onWebViewCreated,
+                                      onLoadStop: (url) {
+                                        // Handle onLoadStop with additional debug functionality
+                                        // Try calling a JS method to fetch state
+                                        _bridge
+                                            .invokeJs('page.getState')
+                                            .then((state) {
+                                              debugPrint(
+                                                'JS page.getState -> $state',
+                                              );
+                                              _appendMessage(
+                                                'page.getState',
+                                                state.toString(),
+                                                'flutter-to-h5',
+                                              );
+                                            })
+                                            .catchError((e) {
+                                              debugPrint(
+                                                'JS page.getState error -> $e',
+                                              );
+                                              _appendMessage(
+                                                'page.getState',
+                                                'Error: ${e.toString()}',
+                                                'flutter-to-h5',
+                                              );
+                                            });
 
-                                          if (widget.onLoadStop != null) {
-                                            widget.onLoadStop!(url);
-                                          }
-                                        },
-                                        onLoadError: widget.onLoadError,
-                                      ),
+                                        if (widget.onLoadStop != null) {
+                                          widget.onLoadStop!(url);
+                                        }
+                                      },
+                                      onLoadError: widget.onLoadError,
                                     ),
                                   ),
                                 ),

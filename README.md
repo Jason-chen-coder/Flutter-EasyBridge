@@ -627,7 +627,7 @@ assets/h5/your-app/
 ```dart
 _handleGetLocalApps([
   'debugger-app',
-  'rich-lab',
+  'rich-editor',
   'your-app',  // 添加你的应用名称
 ])
 ```

@@ -56,7 +56,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
         print('[AppCenter] Failed to load cache apps: $e');
         return <AppItem>[];
       }),
-      _handleGetLocalApps(['debugger-app', 'rich-lab', 'react-app']).catchError(
+      _handleGetLocalApps(['debugger-app', 'rich-editor', 'react-app']).catchError(
         (e) {
           print('[AppCenter] Failed to load local apps: $e');
           return <AppItem>[];
@@ -113,7 +113,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
                     heroTag: heroTag,
                     heroIcon: Image.asset(iconPath, fit: BoxFit.cover),
                   );
-                } else if (appName == 'rich-lab') {
+                } else if (appName == 'rich-editor') {
                   content = RichLabDebugPage(
                     key: UniqueKey(),
                     appName: appName,
@@ -314,27 +314,26 @@ class _AppCenterPageState extends State<AppCenterPage> {
               icon: Image.network(iconUrl, fit: BoxFit.cover),
               heroTag: heroTag,
               type: AppType.online,
-              builder:
-                  (context) => RichLabDebugPage(
-                    key: UniqueKey(),
-                    appName: name,
-                    onlineUrl: url,
-                    heroTag: heroTag,
-                    heroIcon: Image.asset(iconUrl, fit: BoxFit.cover),
-                  ),
-
-              //  Scaffold(
-              //   backgroundColor: Colors.white,
-              //   appBar: AppBar(backgroundColor: Colors.white),
-              //   body: H5Webview(
-              //     key: UniqueKey(),
-              //     appName: id,
-              //     bridge: AppBridge.instance,
-              //     onlineUrl: url,
-              //     heroTag: heroTag,
-              //     heroIcon: Image.network(iconUrl, fit: BoxFit.cover),
-              //   ),
-              // ),
+              builder:(context) =>
+                  //  RichLabDebugPage(
+                  //   key: UniqueKey(),
+                  //   appName: name,
+                  //   onlineUrl: url,
+                  //   heroTag: heroTag,
+                  //   heroIcon: Image.asset(iconUrl, fit: BoxFit.cover),
+                  // ),
+               Scaffold(
+                backgroundColor: Colors.white,
+                appBar: AppBar(backgroundColor: Colors.white),
+                body: H5Webview(
+                  key: UniqueKey(),
+                  appName: id,
+                  bridge: AppBridge.instance,
+                  onlineUrl: url,
+                  heroTag: heroTag,
+                  heroIcon: Image.network(iconUrl, fit: BoxFit.cover),
+                ),
+              ),
             ),
           );
 
@@ -1019,7 +1018,8 @@ class _AppCenterPageState extends State<AppCenterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('应用中心')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(title: const Text('应用中心'),backgroundColor: Colors.white,),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddAppTypeDialog,
         backgroundColor: const Color(0xff31DA9F),

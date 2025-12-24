@@ -228,7 +228,9 @@ class H5WebviewState extends State<H5Webview> {
               (controller, consoleMessage) =>
                   print('console: ${consoleMessage.message}'),
         ),
-          AnimatedOpacity(
+        IgnorePointer(
+          ignoring: showH5Page,
+          child: AnimatedOpacity(
             opacity: showH5Page ? 0.0 : 1.0,
             duration: Duration(milliseconds: 300),
             child: Container(
@@ -245,27 +247,28 @@ class H5WebviewState extends State<H5Webview> {
                     ),
                   ),
                   //
-                    // 共享元素过渡 终点 - 显示应用图标
-                    Center(
-                      child: Hero(
-                        tag: widget.heroTag,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: ClipOval(
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              width: 60,
-                              height: 60,
-                              child: widget.heroIcon,
-                            ),
+                  // 共享元素过渡 终点 - 显示应用图标
+                  Center(
+                    child: Hero(
+                      tag: widget.heroTag,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: ClipOval(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            width: 60,
+                            height: 60,
+                            child: widget.heroIcon,
                           ),
                         ),
                       ),
-                    )
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
+        ),
       ],
     );
   }
