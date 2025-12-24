@@ -1,3 +1,4 @@
+import 'package:easy_bridge/rich_lab_debug_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_bridge/utils/app_bridge.dart';
@@ -12,9 +13,9 @@ import 'package:archive/archive.dart';
 
 /// 应用类型枚举
 enum AppType {
-  online,  // 在线应用
-  cache,   // 缓存应用（离线安装的）
-  local,   // 本地应用（内置）
+  online, // 在线应用
+  cache, // 缓存应用（离线安装的）
+  local, // 本地应用（内置）
 }
 
 class AppItem {
@@ -55,30 +56,28 @@ class _AppCenterPageState extends State<AppCenterPage> {
         print('[AppCenter] Failed to load cache apps: $e');
         return <AppItem>[];
       }),
-      _handleGetLocalApps([
-        'debugger-app',
-        'vue-app',
-        'react-app'
-      ]).catchError((e) {
-        print('[AppCenter] Failed to load local apps: $e');
-        return <AppItem>[];
-      }),
+      _handleGetLocalApps(['debugger-app', 'rich-lab', 'react-app']).catchError(
+        (e) {
+          print('[AppCenter] Failed to load local apps: $e');
+          return <AppItem>[];
+        },
+      ),
       _handleGetOnlineApps().catchError((e) {
         print('[AppCenter] Failed to load online apps: $e');
         return <AppItem>[];
       }),
     ]);
-    
+
     List<AppItem> cacheApps = results[0];
     List<AppItem> localApps = results[1];
     List<AppItem> onlineApps = results[2];
-    
+
     return [...cacheApps, ...localApps, ...onlineApps];
   }
 
   Future<List<AppItem>> _handleGetLocalApps(List<String> appNames) async {
     List<AppItem> localApps = [];
-    
+
     try {
       for (String appName in appNames) {
         try {
@@ -86,16 +85,16 @@ class _AppCenterPageState extends State<AppCenterPage> {
           String manifestPath = 'assets/h5/$appName/manifest.json';
           String manifestContent = await rootBundle.loadString(manifestPath);
           Map<String, dynamic> manifest = json.decode(manifestContent);
-          
+
           // 2. 从 manifest 解析配置信息
           String name = manifest['name'] ?? appName;
           String description = manifest['description'] ?? '';
           String version = manifest['version'] ?? '1.0.0';
           String heroTag = 'local-$appName-hero';
-          
+
           // 3. 构建资源路径
           String iconPath = 'assets/h5/$appName/icon.png';
-          
+
           // 4. 创建 AppItem
           localApps.add(
             AppItem(
@@ -105,14 +104,24 @@ class _AppCenterPageState extends State<AppCenterPage> {
               icon: Image.asset(iconPath),
               heroTag: heroTag,
               type: AppType.local,
-              builder: (context) => appName == 'debugger-app'
-                ? H5WebviewDebugPage(
+              builder: (context) {
+                Widget content;
+                if (appName == 'debugger-app') {
+                  content = H5WebviewDebugPage(
                     key: UniqueKey(),
                     appName: appName,
                     heroTag: heroTag,
-                    heroIcon: Image.asset(iconPath,fit:BoxFit.cover),
-                  )
-                : Scaffold(
+                    heroIcon: Image.asset(iconPath, fit: BoxFit.cover),
+                  );
+                } else if (appName == 'rich-lab') {
+                  content = RichLabDebugPage(
+                    key: UniqueKey(),
+                    appName: appName,
+                    heroTag: heroTag,
+                    heroIcon: Image.asset(iconPath, fit: BoxFit.cover),
+                  );
+                } else {
+                  content = Scaffold(
                     backgroundColor: Colors.white,
                     appBar: AppBar(backgroundColor: Colors.white),
                     body: H5Webview(
@@ -120,12 +129,15 @@ class _AppCenterPageState extends State<AppCenterPage> {
                       appName: appName,
                       bridge: AppBridge.instance,
                       heroTag: heroTag,
-                      heroIcon: Image.asset(iconPath,fit:BoxFit.cover),
+                      heroIcon: Image.asset(iconPath, fit: BoxFit.cover),
                     ),
-                  ),
+                  );
+                }
+                return content;
+              },
             ),
           );
-          
+
           print('[AppCenter] Loaded local app: $name from assets/h5/$appName');
         } catch (e) {
           print('[AppCenter] Error loading local app $appName: $e');
@@ -134,76 +146,77 @@ class _AppCenterPageState extends State<AppCenterPage> {
     } catch (e) {
       print('[AppCenter] Error loading local apps: $e');
     }
-    
+
     return localApps;
   }
 
   Future<List<AppItem>> _handleGetCacheApps() async {
     List<AppItem> cacheApps = [];
-    
+
     try {
       // 1. 获取应用支持目录
       final Directory appSupportDir = await getApplicationSupportDirectory();
       final Directory h5Dir = Directory('${appSupportDir.path}/h5');
-      
+
       // 如果h5目录不存在，直接返回空列表
       if (!await h5Dir.exists()) {
         print('[AppCenter] h5 directory does not exist: ${h5Dir.path}');
         return cacheApps;
       }
-      
+
       // 2. 读取h5目录下的所有子目录
       final List<FileSystemEntity> entities = await h5Dir.list().toList();
-      
+
       for (var entity in entities) {
         if (entity is Directory) {
           final String appName = entity.path.split('/').last;
-          
+
           // 检查必需的文件是否都存在
           final File manifestFile = File('${entity.path}/manifest.json');
           final File iconFile = File('${entity.path}/icon.png');
           final File entryFile = File('${entity.path}/dist/index.html');
-          
+
           bool manifestExists = await manifestFile.exists();
           bool iconExists = await iconFile.exists();
           bool entryExists = await entryFile.exists();
-          
+
           if (manifestExists && iconExists && entryExists) {
             try {
               // 3. 读取并解析manifest.json
               String manifestContent = await manifestFile.readAsString();
               Map<String, dynamic> manifest = json.decode(manifestContent);
-              
+
               // 从manifest读取应用信息
               String name = manifest['name'] ?? appName;
               String description = manifest['description'] ?? '';
               String version = manifest['version'] ?? '1.0.0';
               String heroTag = 'cache-$appName-hero';
-              
+
               // 创建AppItem
               cacheApps.add(
                 AppItem(
                   name: name,
                   description: description,
                   version: version,
-                  icon: Image.file(iconFile,fit:BoxFit.cover,),
+                  icon: Image.file(iconFile, fit: BoxFit.cover),
                   heroTag: heroTag,
                   type: AppType.cache,
-                  builder: (context) => Scaffold(
-                    backgroundColor: Colors.white,
-                    appBar: AppBar(backgroundColor: Colors.white),
-                    body: H5Webview(
-                      key: UniqueKey(),
-                      appName: appName,
-                      bridge: AppBridge.instance,
-                      localFilePath: entryFile.path,  // 使用本地文件路径
-                      heroTag: heroTag,
-                      heroIcon: Image.file(iconFile,fit:BoxFit.cover,),
-                    ),
-                  ),
+                  builder:
+                      (context) => Scaffold(
+                        backgroundColor: Colors.white,
+                        appBar: AppBar(backgroundColor: Colors.white),
+                        body: H5Webview(
+                          key: UniqueKey(),
+                          appName: appName,
+                          bridge: AppBridge.instance,
+                          localFilePath: entryFile.path, // 使用本地文件路径
+                          heroTag: heroTag,
+                          heroIcon: Image.file(iconFile, fit: BoxFit.cover),
+                        ),
+                      ),
                 ),
               );
-              
+
               print('[AppCenter] Loaded cache app: $name');
             } catch (e) {
               print('[AppCenter] Error parsing manifest for $appName: $e');
@@ -219,7 +232,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
     } catch (e) {
       print('[AppCenter] Error loading cache apps: $e');
     }
-    
+
     return cacheApps;
   }
 
@@ -228,24 +241,25 @@ class _AppCenterPageState extends State<AppCenterPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       const String key = 'online_apps_config';
-      
+
       // 如果已经有配置，则不覆盖
       if (prefs.containsKey(key)) {
         print('[AppCenter] Online apps config already exists');
         return;
       }
-      
+
       // 默认在线应用配置
       List<Map<String, dynamic>> defaultApps = [
         {
           'id': 'flutter-official',
           'name': 'Flutter 官网',
           'description': '访问 Flutter 官方网站，了解最新的框架动态和资源。',
-          'iconUrl': 'https://i-blog.csdnimg.cn/direct/445a8fb02750466dbde02cd700fcd51a.png',
+          'iconUrl':
+              'https://i-blog.csdnimg.cn/direct/445a8fb02750466dbde02cd700fcd51a.png',
           'url': 'https://flutter.dev',
         },
       ];
-      
+
       // 保存到 SharedPreferences
       String jsonString = json.encode(defaultApps);
       await prefs.setString(key, jsonString);
@@ -258,21 +272,21 @@ class _AppCenterPageState extends State<AppCenterPage> {
   /// 从 SharedPreferences 读取在线应用配置
   Future<List<AppItem>> _handleGetOnlineApps() async {
     List<AppItem> onlineApps = [];
-    
+
     try {
       // 1. 初始化默认配置（如果不存在）
       await _initDefaultOnlineApps();
-      
+
       // 2. 读取配置
       final prefs = await SharedPreferences.getInstance();
       const String key = 'online_apps_config';
       String? jsonString = prefs.getString(key);
-      
+
       if (jsonString == null || jsonString.isEmpty) {
         print('[AppCenter] No online apps config found');
         return onlineApps;
       }
-      
+
       // 3. 解析配置
       List<dynamic> appsConfig = json.decode(jsonString);
       print("appsConfig===>${appsConfig}");
@@ -286,35 +300,44 @@ class _AppCenterPageState extends State<AppCenterPage> {
           String iconUrl = config['iconUrl'] ?? '';
           String url = config['url'] ?? '';
           String heroTag = 'online-$id-hero';
-          
+
           if (id.isEmpty || url.isEmpty) {
             print('[AppCenter] Skipping online app - missing id or url');
             continue;
           }
-          
+
           onlineApps.add(
             AppItem(
               name: name,
               description: description,
               version: version,
-              icon: Image.network(iconUrl,fit:BoxFit.cover),
+              icon: Image.network(iconUrl, fit: BoxFit.cover),
               heroTag: heroTag,
               type: AppType.online,
-              builder: (context) => Scaffold(
-                backgroundColor: Colors.white,
-                appBar: AppBar(backgroundColor: Colors.white),
-                body: H5Webview(
-                  key: UniqueKey(),
-                  appName: id,
-                  bridge: AppBridge.instance,
-                  onlineUrl: url,
-                  heroTag: heroTag,
-                  heroIcon: Image.network(iconUrl,fit:BoxFit.cover),
-                ),
-              ),
+              builder:
+                  (context) => RichLabDebugPage(
+                    key: UniqueKey(),
+                    appName: name,
+                    onlineUrl: url,
+                    heroTag: heroTag,
+                    heroIcon: Image.asset(iconUrl, fit: BoxFit.cover),
+                  ),
+
+              //  Scaffold(
+              //   backgroundColor: Colors.white,
+              //   appBar: AppBar(backgroundColor: Colors.white),
+              //   body: H5Webview(
+              //     key: UniqueKey(),
+              //     appName: id,
+              //     bridge: AppBridge.instance,
+              //     onlineUrl: url,
+              //     heroTag: heroTag,
+              //     heroIcon: Image.network(iconUrl, fit: BoxFit.cover),
+              //   ),
+              // ),
             ),
           );
-          
+
           print('[AppCenter] Loaded online app: $name');
         } catch (e) {
           print('[AppCenter] Error parsing online app config: $e');
@@ -323,7 +346,7 @@ class _AppCenterPageState extends State<AppCenterPage> {
     } catch (e) {
       print('[AppCenter] Error loading online apps: $e');
     }
-    
+
     return onlineApps;
   }
 
@@ -331,39 +354,40 @@ class _AppCenterPageState extends State<AppCenterPage> {
   void _showAddAppTypeDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加应用'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.file_download),
-              title: const Text('添加离线应用'),
-              subtitle: const Text('上传 zip 压缩包'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showAddOfflineAppDialog();
-              },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('添加应用'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.file_download),
+                  title: const Text('添加离线应用'),
+                  subtitle: const Text('上传 zip 压缩包'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showAddOfflineAppDialog();
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.public),
+                  title: const Text('添加在线应用'),
+                  subtitle: const Text('配置在线网址'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showAddOnlineAppDialog();
+                  },
+                ),
+              ],
             ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.public),
-              title: const Text('添加在线应用'),
-              subtitle: const Text('配置在线网址'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showAddOnlineAppDialog();
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -377,94 +401,95 @@ class _AppCenterPageState extends State<AppCenterPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加在线应用'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: '应用名称 *',
-                    hintText: '请输入应用名称',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '请输入应用名称';
-                    }
-                    return null;
-                  },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('添加在线应用'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: '应用名称 *',
+                        hintText: '请输入应用名称',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入应用名称';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: '应用描述',
+                        hintText: '请输入应用描述',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: iconUrlController,
+                      decoration: const InputDecoration(
+                        labelText: '图标URL *',
+                        hintText: 'https://example.com/icon.png',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入图标URL';
+                        }
+                        if (!value.startsWith('http')) {
+                          return '请输入有效的URL';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: urlController,
+                      decoration: const InputDecoration(
+                        labelText: '应用URL *',
+                        hintText: 'https://example.com',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入应用URL';
+                        }
+                        if (!value.startsWith('http')) {
+                          return '请输入有效的URL';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: '应用描述',
-                    hintText: '请输入应用描述',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: iconUrlController,
-                  decoration: const InputDecoration(
-                    labelText: '图标URL *',
-                    hintText: 'https://example.com/icon.png',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '请输入图标URL';
-                    }
-                    if (!value.startsWith('http')) {
-                      return '请输入有效的URL';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: urlController,
-                  decoration: const InputDecoration(
-                    labelText: '应用URL *',
-                    hintText: 'https://example.com',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '请输入应用URL';
-                    }
-                    if (!value.startsWith('http')) {
-                      return '请输入有效的URL';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.of(context).pop();
+                    await _saveOnlineApp(
+                      nameController.text,
+                      descriptionController.text,
+                      iconUrlController.text,
+                      urlController.text,
+                    );
+                  }
+                },
+                child: const Text('保存'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                await _saveOnlineApp(
-                  nameController.text,
-                  descriptionController.text,
-                  iconUrlController.text,
-                  urlController.text,
-                );
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -478,18 +503,18 @@ class _AppCenterPageState extends State<AppCenterPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       const String key = 'online_apps_config';
-      
+
       // 读取现有配置
       String? jsonString = prefs.getString(key);
       List<dynamic> appsConfig = [];
-      
+
       if (jsonString != null && jsonString.isNotEmpty) {
         appsConfig = json.decode(jsonString);
       }
-      
+
       // 生成唯一 ID
       String id = 'online-${DateTime.now().millisecondsSinceEpoch}';
-      
+
       // 添加新应用
       appsConfig.add({
         'id': id,
@@ -499,27 +524,27 @@ class _AppCenterPageState extends State<AppCenterPage> {
         'url': url,
         'version': '1.0.0',
       });
-      
+
       // 保存配置
       await prefs.setString(key, json.encode(appsConfig));
-      
+
       print('[AppCenter] Online app saved: $name');
-      
+
       // 刷新应用列表
       _refreshAppList();
-      
+
       // 显示成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('在线应用 "$name" 添加成功')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('在线应用 "$name" 添加成功')));
       }
     } catch (e) {
       print('[AppCenter] Error saving online app: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
       }
     }
   }
@@ -528,56 +553,57 @@ class _AppCenterPageState extends State<AppCenterPage> {
   void _showAddOfflineAppDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加离线应用'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('请上传包含以下内容的 zip 压缩包：'),
-            const SizedBox(height: 12),
-            const Text('📁 压缩包根目录应包含：'),
-            const SizedBox(height: 8),
-            _buildRequirementItem('manifest.json', '应用配置文件'),
-            _buildRequirementItem('icon.png', '应用图标'),
-            _buildRequirementItem('dist/index.html', 'H5 入口文件'),
-            const SizedBox(height: 12),
-            const Text(
-              'manifest.json 示例：',
-              style: TextStyle(fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('添加离线应用'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('请上传包含以下内容的 zip 压缩包：'),
+                const SizedBox(height: 12),
+                const Text('📁 压缩包根目录应包含：'),
+                const SizedBox(height: 8),
+                _buildRequirementItem('manifest.json', '应用配置文件'),
+                _buildRequirementItem('icon.png', '应用图标'),
+                _buildRequirementItem('dist/index.html', 'H5 入口文件'),
+                const SizedBox(height: 12),
+                const Text(
+                  'manifest.json 示例：',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '{\n'
+                    '  "name": "我的应用",\n'
+                    '  "description": "应用描述",\n'
+                    '  "version": "1.0.0"\n'
+                    '}',
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(4),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
               ),
-              child: const Text(
-                '{\n'
-                '  "name": "我的应用",\n'
-                '  "description": "应用描述",\n'
-                '  "version": "1.0.0"\n'
-                '}',
-                style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _pickAndInstallOfflineApp();
+                },
+                child: const Text('选择文件'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _pickAndInstallOfflineApp();
-            },
-            child: const Text('选择文件'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -626,21 +652,22 @@ class _AppCenterPageState extends State<AppCenterPage> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('正在安装应用...'),
-                  ],
+          builder:
+              (context) => const Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('正在安装应用...'),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
         );
       }
 
@@ -655,9 +682,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
       print('[AppCenter] Error picking file: $e');
       if (mounted) {
         Navigator.of(context).pop(); // 关闭加载提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('文件选择失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('文件选择失败: $e')));
       }
     }
   }
@@ -678,14 +705,14 @@ class _AppCenterPageState extends State<AppCenterPage> {
       // 遍历所有文件，找到 manifest.json 的位置
       for (final file in archive) {
         final name = file.name;
-        
+
         // 忽略 macOS 系统文件
         if (name.startsWith('__MACOSX/') || name.contains('/.DS_Store')) {
           continue;
         }
-        
+
         print('Found file in zip: $name');
-        
+
         // 查找 manifest.json
         if (name.endsWith('manifest.json') && !name.contains('__MACOSX')) {
           manifestPath = name;
@@ -717,8 +744,12 @@ class _AppCenterPageState extends State<AppCenterPage> {
         if (file.name == indexPath) hasIndex = true;
       }
 
-      print('Validation: hasManifest=$hasManifest, hasIcon=$hasIcon, hasIndex=$hasIndex');
-      print('Looking for: manifest=$manifestPath, icon=$iconPath, index=$indexPath');
+      print(
+        'Validation: hasManifest=$hasManifest, hasIcon=$hasIcon, hasIndex=$hasIndex',
+      );
+      print(
+        'Looking for: manifest=$manifestPath, icon=$iconPath, index=$indexPath',
+      );
 
       if (!hasManifest || !hasIcon || !hasIndex) {
         throw Exception('压缩包缺少必需文件。\n需要: $manifestPath, $iconPath, $indexPath');
@@ -728,9 +759,13 @@ class _AppCenterPageState extends State<AppCenterPage> {
       String? appName;
       for (final file in archive) {
         if (file.name == manifestPath) {
-          final manifestContent = String.fromCharCodes(file.content as List<int>);
+          final manifestContent = String.fromCharCodes(
+            file.content as List<int>,
+          );
           final manifest = json.decode(manifestContent);
-          appName = manifest['name'] ?? 'app-${DateTime.now().millisecondsSinceEpoch}';
+          appName =
+              manifest['name'] ??
+              'app-${DateTime.now().millisecondsSinceEpoch}';
           break;
         }
       }
@@ -742,16 +777,17 @@ class _AppCenterPageState extends State<AppCenterPage> {
       // 5. 获取应用支持目录
       final Directory appSupportDir = await getApplicationSupportDirectory();
       final Directory h5Dir = Directory('${appSupportDir.path}/h5');
-      
+
       // 确保 h5 目录存在
       if (!await h5Dir.exists()) {
         await h5Dir.create(recursive: true);
       }
 
       // 6. 创建应用目录（使用时间戳避免重名）
-      final String uniqueAppName = '${appName.replaceAll(' ', '-')}-${DateTime.now().millisecondsSinceEpoch}';
+      final String uniqueAppName =
+          '${appName.replaceAll(' ', '-')}-${DateTime.now().millisecondsSinceEpoch}';
       final Directory appDir = Directory('${h5Dir.path}/$uniqueAppName');
-      
+
       if (await appDir.exists()) {
         await appDir.delete(recursive: true);
       }
@@ -760,25 +796,27 @@ class _AppCenterPageState extends State<AppCenterPage> {
       // 7. 解压文件（去除根目录前缀，忽略系统文件）
       for (final file in archive) {
         final name = file.name;
-        
+
         // 忽略 macOS 系统文件和隐藏文件
-        if (name.startsWith('__MACOSX/') || 
-            name.contains('/.DS_Store') || 
+        if (name.startsWith('__MACOSX/') ||
+            name.contains('/.DS_Store') ||
             name.endsWith('.DS_Store')) {
           continue;
         }
-        
+
         // 去除根目录前缀
         String relativePath = name;
-        if (appRootPrefix != null && appRootPrefix.isNotEmpty && name.startsWith(appRootPrefix)) {
+        if (appRootPrefix != null &&
+            appRootPrefix.isNotEmpty &&
+            name.startsWith(appRootPrefix)) {
           relativePath = name.substring(appRootPrefix.length);
         }
-        
+
         // 跳过空路径（根目录本身）
         if (relativePath.isEmpty) {
           continue;
         }
-        
+
         if (file.isFile) {
           final data = file.content as List<int>;
           final outputFile = File('${appDir.path}/$relativePath');
@@ -798,16 +836,16 @@ class _AppCenterPageState extends State<AppCenterPage> {
 
       // 9. 显示成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('离线应用 "$appName" 安装成功')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('离线应用 "$appName" 安装成功')));
       }
     } catch (e) {
       print('[AppCenter] Error installing offline app: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('安装失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('安装失败: $e')));
       }
     }
   }
@@ -824,34 +862,36 @@ class _AppCenterPageState extends State<AppCenterPage> {
     // 先显示确认对话框
     bool? confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除应用'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('确定要删除应用 "${app.name}" 吗？'),
-            const SizedBox(height: 12),
-            const Text(
-              '⚠️ 删除将不可撤回',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('删除应用'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('确定要删除应用 "${app.name}" 吗？'),
+                const SizedBox(height: 12),
+                const Text(
+                  '⚠️ 删除将不可撤回',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
 
     if (confirm != true) {
@@ -868,9 +908,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
     } catch (e) {
       print('[AppCenter] Error deleting app: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
       }
     }
   }
@@ -902,7 +942,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
         id = id.substring(0, id.length - 5); // 移除 '-hero' 后缀
       }
 
-      print('[AppCenter] Deleting online app: ${app.name}, heroTag: ${app.heroTag}, extracted id: $id');
+      print(
+        '[AppCenter] Deleting online app: ${app.name}, heroTag: ${app.heroTag}, extracted id: $id',
+      );
 
       // 查找并移除对应的应用
       int removedCount = 0;
@@ -917,7 +959,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
 
       if (removedCount == 0) {
         print('[AppCenter] Warning: No app found with id: $id');
-        print('[AppCenter] Available app ids: ${appsConfig.map((c) => c['id']).toList()}');
+        print(
+          '[AppCenter] Available app ids: ${appsConfig.map((c) => c['id']).toList()}',
+        );
       }
 
       // 保存更新后的配置
@@ -930,9 +974,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
 
       // 显示成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('应用 "${app.name}" 已删除')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('应用 "${app.name}" 已删除')));
       }
     } catch (e) {
       print('[AppCenter] Error deleting online app: $e');
@@ -962,9 +1006,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
 
       // 显示成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('应用 "${app.name}" 已删除')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('应用 "${app.name}" 已删除')));
       }
     } catch (e) {
       print('[AppCenter] Error deleting cache app: $e');
@@ -986,23 +1030,17 @@ class _AppCenterPageState extends State<AppCenterPage> {
         future: _buildApps(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Text('加载应用失败: ${snapshot.error}'),
-            );
+            return Center(child: Text('加载应用失败: ${snapshot.error}'));
           }
 
           final apps = snapshot.data ?? [];
 
           if (apps.isEmpty) {
-            return const Center(
-              child: Text('暂无应用'),
-            );
+            return const Center(child: Text('暂无应用'));
           }
 
           return Padding(
@@ -1024,9 +1062,9 @@ class _AppCenterPageState extends State<AppCenterPage> {
                   icon: app.icon,
                   heroTag: app.heroTag,
                   onTap: () async {
-                    Navigator.of(
-                      context,
-                    ).push(MaterialPageRoute(builder: (_) => app.builder(context)));
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => app.builder(context)),
+                    );
                   },
                   type: app.type,
                   onDelete: () => _deleteApp(app),
@@ -1124,7 +1162,9 @@ class _AppTile extends StatelessWidget {
                             child: ElevatedButton(
                               onPressed: onTap,
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 backgroundColor: Color(0xff31DA9F),
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
@@ -1141,15 +1181,20 @@ class _AppTile extends StatelessWidget {
                           SizedBox(
                             height: 26,
                             child: ElevatedButton(
-                              onPressed: type == AppType.local ? null : onDelete,
+                              onPressed:
+                                  type == AppType.local ? null : onDelete,
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                backgroundColor: type == AppType.local 
-                                    ? Colors.grey[300]
-                                    : Colors.red,
-                                foregroundColor: type == AppType.local 
-                                    ? Colors.grey[600]
-                                    : Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                backgroundColor:
+                                    type == AppType.local
+                                        ? Colors.grey[300]
+                                        : Colors.red,
+                                foregroundColor:
+                                    type == AppType.local
+                                        ? Colors.grey[600]
+                                        : Colors.white,
                                 disabledBackgroundColor: Colors.grey[300],
                                 disabledForegroundColor: Colors.grey[600],
                                 shape: RoundedRectangleBorder(
@@ -1170,10 +1215,7 @@ class _AppTile extends StatelessWidget {
                   // 第二行：版本号
                   Text(
                     'v$version',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xff999999),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xff999999)),
                   ),
                   const SizedBox(height: 11),
                   // 第三行：描述 + 更多按钮
@@ -1195,24 +1237,32 @@ class _AppTile extends StatelessWidget {
                           onPressed: () {
                             showDialog(
                               context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text(name),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('版本: v$version'),
-                                    const SizedBox(height: 8),
-                                     Text('描述:$description', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(),
-                                    child: const Text('关闭'),
+                              builder:
+                                  (context) => AlertDialog(
+                                    title: Text(name),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('版本: v$version'),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '描述:$description',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed:
+                                            () => Navigator.of(context).pop(),
+                                        child: const Text('关闭'),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
                             );
                           },
                           style: TextButton.styleFrom(

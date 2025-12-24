@@ -1,0 +1,7 @@
+@import './base.css';
+
+
+/* editor 全局样式覆盖 */
+.w-e-textarea-link-card-container{
+    width: 100%!important;
+}

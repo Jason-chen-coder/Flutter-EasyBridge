@@ -70,9 +70,9 @@ flutter:
     - assets/h5/debugger-app/
     - assets/h5/debugger-app/dist/
     - assets/h5/debugger-app/dist/assets/
-    - assets/h5/vue-app/
-    - assets/h5/vue-app/dist/
-    - assets/h5/vue-app/dist/assets/
+    - assets/h5/rich-lab/
+    - assets/h5/rich-lab/dist/
+    - assets/h5/rich-lab/dist/assets/
     - assets/h5/react-app/
     - assets/h5/react-app/dist/
     - assets/h5/react-app/dist/assets/

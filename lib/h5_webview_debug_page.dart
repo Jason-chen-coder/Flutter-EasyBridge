@@ -12,7 +12,7 @@
 /// Usage:
 /// ```dart
 /// H5WebviewDebugPage(
-///   appName: 'app1', // or 'app2', 'vue-app', etc.
+///   appName: 'app1', // or 'app2', 'rich-lab', etc.
 ///   onWebViewCreated: (controller) {
 ///     // Handle webview creation
 ///   },
@@ -43,7 +43,7 @@ class MessageItem {
 }
 
 class H5WebviewDebugPage extends StatefulWidget {
-  /// appName should correspond to the folder name under assets/h5, e.g. "app1", "app2", "vue-app"
+  /// appName should correspond to the folder name under assets/h5, e.g. "app1", "app2", "rich-lab"
   /// The entry point will be assets/h5/<appName>/dist/index.html
   /// This is ignored if onlineUrl is provided
   final String appName;
@@ -657,106 +657,113 @@ class _H5WebviewDebugPageState extends State<H5WebviewDebugPage> {
             // Right: H5 WebView
             Expanded(
               child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    children: [
-                      // 背景：手机壳
-                      Positioned.fill(
-                        child: Image.asset(
-                          'assets/images/phone.png',
-                          fit: BoxFit.contain,
-                        ),
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    // 背景：手机壳
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/phone.png',
+                        fit: BoxFit.contain,
                       ),
-                      // 屏幕区域放 Widget，根据手机壳比例 0.4586:1 动态计算位置
-                      Positioned.fill(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            // 手机壳图片宽高比
-                            const phoneAspectRatio = 0.4586;
-                            final maxWidth = constraints.maxWidth;
-                            final maxHeight = constraints.maxHeight;
-                            
-                            // 根据约束计算实际手机壳尺寸
-                            double phoneWidth, phoneHeight;
-                            if (maxWidth / maxHeight > phoneAspectRatio) {
-                              // 高度是限制因素
-                              phoneHeight = maxHeight;
-                              phoneWidth = phoneHeight * phoneAspectRatio;
-                            } else {
-                              // 宽度是限制因素
-                              phoneWidth = maxWidth;
-                              phoneHeight = phoneWidth / phoneAspectRatio;
-                            }
-                            
-                            // 计算居中的手机壳偏移
-                            final phoneOffsetLeft = (maxWidth - phoneWidth) / 2;
-                            final phoneOffsetTop = (maxHeight - phoneHeight) / 2;
-                            
-                            // 计算屏幕相对于手机壳的内边距（百分比）
-                            // 这些值可以根据实际的手机壳设计调整
-                            final screenPaddingHRatio = 0.04; // 左右各12.8%
-                            final screenPaddingVRatio = 0.020; // 上下各2.5%
-                            
-                            final screenPaddingH = phoneWidth * screenPaddingHRatio;
-                            final screenPaddingV = phoneHeight * screenPaddingVRatio;
-                            
-                            return Stack(
-                              children: [
-                                Positioned(
-                                  left: phoneOffsetLeft + screenPaddingH,
-                                  right: phoneOffsetLeft + screenPaddingH,
-                                  top: phoneOffsetTop + screenPaddingV,
-                                  bottom: phoneOffsetTop + screenPaddingV,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      color: Colors.red, // 模拟屏幕背景
-                                      child: Center(
-                                        child: H5Webview(
-                                          appName: widget.appName,
-                                          bridge: _bridge,
-                                          heroTag: widget.heroTag,
-                                          heroIcon: widget.heroIcon,
-                                          onWebViewCreated: widget.onWebViewCreated,
-                                          onLoadStop: (url) {
-                                            // Handle onLoadStop with additional debug functionality
-                                            // Try calling a JS method to fetch state
-                                            _bridge
-                                                .invokeJs('page.getState')
-                                                .then((state) {
-                                              debugPrint('JS page.getState -> $state');
-                                              _appendMessage(
-                                                'page.getState',
-                                                state.toString(),
-                                                'flutter-to-h5',
-                                              );
-                                            })
-                                                .catchError((e) {
-                                              debugPrint('JS page.getState error -> $e');
-                                              _appendMessage(
-                                                'page.getState',
-                                                'Error: ${e.toString()}',
-                                                'flutter-to-h5',
-                                              );
-                                            });
+                    ),
+                    // 屏幕区域放 Widget，根据手机壳比例 0.4586:1 动态计算位置
+                    Positioned.fill(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // 手机壳图片宽高比
+                          const phoneAspectRatio = 0.4586;
+                          final maxWidth = constraints.maxWidth;
+                          final maxHeight = constraints.maxHeight;
 
-                                            if (widget.onLoadStop != null) {
-                                              widget.onLoadStop!(url);
-                                            }
-                                          },
-                                          onLoadError: widget.onLoadError,
-                                        ),
+                          // 根据约束计算实际手机壳尺寸
+                          double phoneWidth, phoneHeight;
+                          if (maxWidth / maxHeight > phoneAspectRatio) {
+                            // 高度是限制因素
+                            phoneHeight = maxHeight;
+                            phoneWidth = phoneHeight * phoneAspectRatio;
+                          } else {
+                            // 宽度是限制因素
+                            phoneWidth = maxWidth;
+                            phoneHeight = phoneWidth / phoneAspectRatio;
+                          }
+
+                          // 计算居中的手机壳偏移
+                          final phoneOffsetLeft = (maxWidth - phoneWidth) / 2;
+                          final phoneOffsetTop = (maxHeight - phoneHeight) / 2;
+
+                          // 计算屏幕相对于手机壳的内边距（百分比）
+                          // 这些值可以根据实际的手机壳设计调整
+                          final screenPaddingHRatio = 0.04; // 左右各12.8%
+                          final screenPaddingVRatio = 0.020; // 上下各2.5%
+
+                          final screenPaddingH =
+                              phoneWidth * screenPaddingHRatio;
+                          final screenPaddingV =
+                              phoneHeight * screenPaddingVRatio;
+
+                          return Stack(
+                            children: [
+                              Positioned(
+                                left: phoneOffsetLeft + screenPaddingH,
+                                right: phoneOffsetLeft + screenPaddingH,
+                                top: phoneOffsetTop + screenPaddingV,
+                                bottom: phoneOffsetTop + screenPaddingV,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    color: Colors.red, // 模拟屏幕背景
+                                    child: Center(
+                                      child: H5Webview(
+                                        appName: widget.appName,
+                                        bridge: _bridge,
+                                        heroTag: widget.heroTag,
+                                        heroIcon: widget.heroIcon,
+                                        onWebViewCreated:
+                                            widget.onWebViewCreated,
+                                        onLoadStop: (url) {
+                                          // Handle onLoadStop with additional debug functionality
+                                          // Try calling a JS method to fetch state
+                                          _bridge
+                                              .invokeJs('page.getState')
+                                              .then((state) {
+                                                debugPrint(
+                                                  'JS page.getState -> $state',
+                                                );
+                                                _appendMessage(
+                                                  'page.getState',
+                                                  state.toString(),
+                                                  'flutter-to-h5',
+                                                );
+                                              })
+                                              .catchError((e) {
+                                                debugPrint(
+                                                  'JS page.getState error -> $e',
+                                                );
+                                                _appendMessage(
+                                                  'page.getState',
+                                                  'Error: ${e.toString()}',
+                                                  'flutter-to-h5',
+                                                );
+                                              });
+
+                                          if (widget.onLoadStop != null) {
+                                            widget.onLoadStop!(url);
+                                          }
+                                        },
+                                        onLoadError: widget.onLoadError,
                                       ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            );
-                          },
-                        ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                    ],
-                  )
+                    ),
+                  ],
+                ),
                 // Positioned(
                 //   child: Container(
                 //     color: Colors.transparent,

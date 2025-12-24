@@ -12,7 +12,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'common.dart';
 
-
 /// AppBridge：Flutter 与 H5 之间的双向通信桥接
 ///
 /// 这是一个简洁、版本化的双向通信桥接，用于在 Flutter 应用和 H5 页面之间进行通信。
@@ -153,7 +152,8 @@ class AppBridge {
 
         // Debug logging to understand the argument structure
         print(
-            "[AppBridge] Received args: $args, types: ${args.map((e) => '${e.runtimeType}').toList()}");
+          "[AppBridge] Received args: $args, types: ${args.map((e) => '${e.runtimeType}').toList()}",
+        );
 
         // Extract method name - handle both [methodName, params] and [params] formats
         String method;
@@ -167,22 +167,24 @@ class AppBridge {
 
           // 智能参数解包：如果 params 是单元素数组，自动解包为该元素
           // 这样 H5 调用 method(singleArg) 时，Flutter 端直接收到 singleArg 而不是 [singleArg]
-          // 
+          //
           // 设计说明：
           // - 单参数调用（最常见）：method(arg) → 自动解包为 arg
           // - 多参数调用：method(arg1, arg2) → 保持为 [arg1, arg2]
           // - 无参数调用：method() → 空数组 []
-          // 
+          //
           // 如果某个方法需要区分 "传了一个数组" 和 "传了多个参数"，
           // 可以在该方法的 handler 中检查 params is List 来判断
           if (params is List && params.length == 1) {
             params = params[0];
             print(
-                "[AppBridge] Auto-unpacked single-element array, new params type: ${params.runtimeType}");
+              "[AppBridge] Auto-unpacked single-element array, new params type: ${params.runtimeType}",
+            );
           }
 
           print(
-              "[AppBridge] Using standard format - method: $method, params type: ${params.runtimeType}");
+            "[AppBridge] Using standard format - method: $method, params type: ${params.runtimeType}",
+          );
         } else if (args.length >= 2) {
           // Possible alternative format where methodName might be in a different position
           // Try to find a string that looks like a method name
@@ -199,18 +201,23 @@ class AppBridge {
             params = args.where((e) => e != foundMethod).toList();
 
             print(
-                "[AppBridge] Using fallback format - method: $method found at index, params: $params");
+              "[AppBridge] Using fallback format - method: $method found at index, params: $params",
+            );
           } else {
             print(
-                '[AppBridge] No string method name found in arguments. args: $args');
+              '[AppBridge] No string method name found in arguments. args: $args',
+            );
             throw Exception(
-                'No method name found. Received: ${args.map((e) => e.runtimeType).toList()}');
+              'No method name found. Received: ${args.map((e) => e.runtimeType).toList()}',
+            );
           }
         } else {
           print(
-              '[AppBridge] Invalid arguments. Expected at least method name. Received: $args');
+            '[AppBridge] Invalid arguments. Expected at least method name. Received: $args',
+          );
           throw Exception(
-              'Invalid arguments format. args[0] type: ${args[0].runtimeType}');
+            'Invalid arguments format. args[0] type: ${args[0].runtimeType}',
+          );
         }
 
         print("[AppBridge] JS 调用 Flutter：方法名：${method}；\n 参数：${params}");
@@ -228,25 +235,75 @@ class AppBridge {
         }
       },
     );
+
+    // Handle responses/events coming back from JS SDK
+    controller.addJavaScriptHandler(
+      handlerName: 'bridge:message',
+      callback: (args) async {
+        if (args.isEmpty || args.first is! Map) {
+          print('[AppBridge] bridge:message received invalid payload: $args');
+          return;
+        }
+
+        final Map msg = args.first as Map;
+        final type = msg['type'];
+
+        if (type == 'response') {
+          final id = msg['id']?.toString();
+          if (id == null) return;
+          final pending = _pendingJsRequests.remove(id);
+          if (pending == null) return;
+          pending.timer.cancel();
+          final error = msg['error'];
+          if (error != null) {
+            pending.completer.completeError(error);
+          } else {
+            pending.completer.complete(msg['result']);
+          }
+          return;
+        }
+
+        if (type == 'event') {
+          final method = msg['method']?.toString();
+          final params = msg['params'];
+          if (method != null && _eventListeners.containsKey(method)) {
+            _eventListeners[method]!(params);
+          }
+          return;
+        }
+      },
+    );
   }
 
   /// Initialize default handlers that can be called from H5
   /// 初始化as 对象方法
   Future<void> _initDefaultHandlers() async {
     // 获取能力(用于H5获取当前AppBridge的方法列表)
-    register('as.getCapabilities', (params) async {
-      return _handleGetCapabilities();
-    }, description: "获取当前 AppBridge 的能力和可用方法列表", paramsDescription: '无参数');
+    register(
+      'as.getCapabilities',
+      (params) async {
+        return _handleGetCapabilities();
+      },
+      description: "获取当前 AppBridge 的能力和可用方法列表",
+      paramsDescription: '无参数',
+    );
     // 获取设备信息
-    register('as.getInfo', (params) async {
-      return _handleGetInfo();
-    }, description: '获取当前 AppBridge 的能力和可用方法列表', paramsDescription: '无参数');
+    register(
+      'as.getInfo',
+      (params) async {
+        return _handleGetInfo();
+      },
+      description: '获取当前 AppBridge 的能力和可用方法列表',
+      paramsDescription: '无参数',
+    );
     // 选择文件
-    register('as.selectFile', (params) async {
-      return await _handleSelectFile(params);
-    },
-        description: '打开文件选择器供用户选择文件',
-        paramsDescription: '''参数格式：Map（可选）
+    register(
+      'as.selectFile',
+      (params) async {
+        return await _handleSelectFile(params);
+      },
+      description: '打开文件选择器供用户选择文件',
+      paramsDescription: '''参数格式：Map（可选）
 H5 调用示例：as.selectFile({type: 'image', multiple: false})
 Flutter 接收到的 params 将自动解包为：
 {
@@ -254,20 +311,24 @@ Flutter 接收到的 params 将自动解包为：
   "multiple": false,         // 是否多选，默认 false
   "maxSize": 10485760,       // 最大文件大小（字节），默认 10MB
   "mimeTypes": ["image/*"]   // 允许的 MIME 类型列表，可选
-}''');
+}''',
+    );
     // 下载 Blob 数据
-    register('as.downloadBlob', (params) async {
-      return await _handleDownloadBlob(params);
-    },
-        description: '下载 Blob 数据到本地文件系统',
-        paramsDescription: '''参数格式：Map（必需）
+    register(
+      'as.downloadBlob',
+      (params) async {
+        return await _handleDownloadBlob(params);
+      },
+      description: '下载 Blob 数据到本地文件系统',
+      paramsDescription: '''参数格式：Map（必需）
 H5 调用示例：as.downloadBlob({base64: '...', filename: 'doc.xlsx'})
 Flutter 接收到的 params 将自动解包为：
 {
   "base64": "UEsDBAoAAAAAANuYrV...",  // Base64 编码的文件数据（必需）
   "filename": "document.xlsx"         // 保存的文件名（必需）
 }
-''');
+''',
+    );
   }
 
   Future<Map<String, dynamic>> _handleGetCapabilities() async {
@@ -277,29 +338,30 @@ Flutter 接收到的 params 将自动解包为：
         for (final method in _routes.keys)
           method: {
             'description':
-            _methodDescriptions[method] ?? 'No description available',
+                _methodDescriptions[method] ?? 'No description available',
             if (_methodParamsDescriptions.containsKey(method))
               'params': _methodParamsDescriptions[method],
-          }
+          },
       },
       'features': {
         'events': true,
         'requestFromFlutter': true,
         'requestFromJs': true,
-      }
+      },
     };
   }
 
   Future<Map<String, dynamic>> _handleGetInfo() async {
     return {
-      'device': Platform.isAndroid
-          ? 'android'
-          : Platform.isIOS
-          ? 'ios'
-          : Platform.isMacOS
-          ? 'macos'
-          : 'unknown',
-      'version': version
+      'device':
+          Platform.isAndroid
+              ? 'android'
+              : Platform.isIOS
+              ? 'ios'
+              : Platform.isMacOS
+              ? 'macos'
+              : 'unknown',
+      'version': version,
     };
   }
 
@@ -324,11 +386,7 @@ Flutter 接收到的 params 将自动解包为：
       final result = await _pickFiles(options);
 
       if (result == null || result.files.isEmpty) {
-        return {
-          'success': false,
-          'error': '用户取消选择',
-          'code': 'USER_CANCELLED',
-        };
+        return {'success': false, 'error': '用户取消选择', 'code': 'USER_CANCELLED'};
       }
 
       // 4. 处理选中的文件
@@ -363,11 +421,7 @@ Flutter 接收到的 params 将自动解包为：
       };
     } catch (e) {
       print('[AppBridge] selectFile error: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-        'code': 'ERROR',
-      };
+      return {'success': false, 'error': e.toString(), 'code': 'ERROR'};
     }
   }
 
@@ -410,9 +464,9 @@ Flutter 接收到的 params 将自动解包为：
 
     // 如果有指定扩展名，必须使用 FileType.custom
     final FileType pickerFileType =
-    (allowedExtensions != null && allowedExtensions.isNotEmpty)
-        ? FileType.custom
-        : getFilePickerType(fileType);
+        (allowedExtensions != null && allowedExtensions.isNotEmpty)
+            ? FileType.custom
+            : getFilePickerType(fileType);
 
     return FilePicker.platform.pickFiles(
       type: pickerFileType,
@@ -427,14 +481,15 @@ Flutter 接收到的 params 将自动解包为：
   /// Process a single file and convert to Base64
   /// Returns file data map or null if file is invalid
   Future<Map<String, dynamic>?> _processFile(
-      PlatformFile file,
-      Map<String, dynamic> options,
-      ) async {
-
+    PlatformFile file,
+    Map<String, dynamic> options,
+  ) async {
     // 1. 检查文件大小
     final maxSize = options['maxSize'] as int;
     if (file.size > maxSize) {
-      throw Exception("文件大小超过限制: ${file.size.toString()} > ${maxSize.toString()}");
+      throw Exception(
+        "文件大小超过限制: ${file.size.toString()} > ${maxSize.toString()}",
+      );
     }
 
     // 2. 获取文件数据
@@ -465,9 +520,11 @@ Flutter 接收到的 params 将自动解包为：
       'name': file.name,
       'size': file.size,
       'mimeType': mimeType,
-      'lastModified': file.name.isNotEmpty
-          ? (await File(file.path ?? '').lastModified()).millisecondsSinceEpoch
-          : DateTime.now().millisecondsSinceEpoch,
+      'lastModified':
+          file.name.isNotEmpty
+              ? (await File(file.path ?? '').lastModified())
+                  .millisecondsSinceEpoch
+              : DateTime.now().millisecondsSinceEpoch,
       'base64': 'data:$mimeType;base64,$base64String',
     };
   }
@@ -489,9 +546,9 @@ Flutter 接收到的 params 将自动解包为：
         base64String = params['base64'] as String?;
         filename = params['filename'] as String?;
         debugPrint(
-            '[AppBridge] Extracted from Map: base64=${base64String?.length ?? 0} bytes, filename=$filename');
+          '[AppBridge] Extracted from Map: base64=${base64String?.length ?? 0} bytes, filename=$filename',
+        );
       }
-
 
       if (base64String == null || base64String.isEmpty) {
         return {
@@ -502,11 +559,7 @@ Flutter 接收到的 params 将自动解包为：
       }
 
       if (filename == null || filename.isEmpty) {
-        return {
-          'success': false,
-          'error': '缺少文件名',
-          'code': 'MISSING_FILENAME',
-        };
+        return {'success': false, 'error': '缺少文件名', 'code': 'MISSING_FILENAME'};
       }
 
       // 移除 data: URL 前缀如果存在
@@ -568,11 +621,7 @@ Flutter 接收到的 params 将自动解包为：
       };
     } catch (e) {
       print('[AppBridge] downloadBlob error: $e');
-      return {
-        'success': false,
-        'error': e.toString(),
-        'code': 'ERROR',
-      };
+      return {'success': false, 'error': e.toString(), 'code': 'ERROR'};
     }
   }
 
@@ -583,8 +632,11 @@ Flutter 接收到的 params 将自动解包为：
 
   /// Register a Flutter handler for a method (JS -> Flutter requests).
   void register(
-      String method, FutureOr<dynamic> Function(dynamic params) handler,
-      {String? description, String? paramsDescription}) {
+    String method,
+    FutureOr<dynamic> Function(dynamic params) handler, {
+    String? description,
+    String? paramsDescription,
+  }) {
     print('[AppBridge] Registering method: $method');
     _routes[method] = handler;
     if (description != null) {
@@ -619,8 +671,11 @@ Flutter 接收到的 params 将自动解包为：
   }
 
   /// Invoke a JS-registered method and get the result (Flutter -> JS request/response).
-  Future<dynamic> invokeJs(String method,
-      [dynamic params, Duration timeout = const Duration(seconds: 10)]) async {
+  Future<dynamic> invokeJs(
+    String method, [
+    dynamic params,
+    Duration timeout = const Duration(seconds: 10),
+  ]) async {
     final String id = _generateId();
     final completer = Completer<dynamic>();
     final timer = Timer(timeout, () {
@@ -629,8 +684,10 @@ Flutter 接收到的 params 将自动解包为：
         completer.completeError(_BridgeTimeoutError());
       }
     });
-    _pendingJsRequests[id] =
-        _PendingRequest(completer: completer, timer: timer);
+    _pendingJsRequests[id] = _PendingRequest(
+      completer: completer,
+      timer: timer,
+    );
 
     await _sendToJs({
       'v': version,
@@ -647,9 +704,7 @@ Flutter 接收到的 params 将自动解包为：
     if (_controller == null) return;
     await _controller!.callAsyncJavaScript(
       functionBody: 'window.__bridge_onNativeMessage(message);',
-      arguments: {
-        'message': message,
-      },
+      arguments: {'message': message},
     );
   }
 
@@ -658,6 +713,7 @@ Flutter 接收到的 params 将自动解包为：
 
   static int _idCounter = 0;
 }
+
 class _PendingRequest {
   _PendingRequest({required this.completer, required this.timer});
   final Completer<dynamic> completer;
